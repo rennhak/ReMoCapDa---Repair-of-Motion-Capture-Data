@@ -14,6 +14,10 @@ require 'rubygems'
 $:.push('.')
 require 'Logger'
 
+# From MotionX - FIXME: Use MotionX's XYAML interface
+$:.push('../base/MotionX/src/plugins/vpm/src')
+require 'ADT.rb'
+
 
 # ReMoCapDa class is a CLI interface for the sa library
 class ReMoCapDa # {{{
@@ -41,6 +45,9 @@ class ReMoCapDa # {{{
       #
       ##########
 
+      unless( @options.tpose.nil? )
+        @logger.message( :success, "Got T-Pose frame from CLI (#{@options.tpose.to_s})" )
+      end
 
       @logger.message( :success, "Finished #{__FILE__} run" )
     end # of unless( options.nil? ) }}}
@@ -66,6 +73,9 @@ class ReMoCapDa # {{{
     options.colorize        = false
     options.debug           = false
     options.quiet           = false
+    options.tpose           = nil
+    options.input_filename  = nil
+    options.output_filename = nil
 
     pristine_options        = options.dup
 
@@ -74,6 +84,10 @@ class ReMoCapDa # {{{
 
       opts.separator ""
       opts.separator "General options:"
+
+      opts.on( "-t", "--tpose OPT", "T-Pose frame used for calibration (needs frame number as argument)" ) { |frame| options.tpose = frame }
+      opts.on( "-i", "--input OPT", "Input VPM file (including path)" ) { |filename| options.input_filename = filename }
+      opts.on( "-o", "--output OPT", "Output VPM file (including path)" ) { |filename| options.output_filename = filename }
 
       opts.separator ""
       opts.separator "Specific options:"
