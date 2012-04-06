@@ -1,0 +1,10 @@
+Name:         MotionX
+License:      Dual licensed under GPLv2 and MIT
+License URL:  --
+
+
+How to update
+-------------
+
+git submodule update
+

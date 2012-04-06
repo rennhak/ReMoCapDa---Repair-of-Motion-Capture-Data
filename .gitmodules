@@ -1,0 +1,3 @@
+[submodule "base/MotionX"]
+	path = base/MotionX
+	url = git@github.com:rennhak/MotionX.git
