@@ -16,6 +16,34 @@ correct value based on prior T-Pose configuration.
 
 The result should be a repaired motion stream usable for your data processing needs.
 
+EXAMPLE
+
+Step 1
+  Extract a proper config file describing the necessary measurements of the target body.
+  Often this is extracted during the T-Pose phase. It extract crucial body measurements and angles
+  necessary for Pose reconstruction, if markers are missing.
+
+  ~# ./ReMoCapDa.rb -c -i input.vpm -t 134 -o input_tpose.yaml 
+
+  This command will print colorized, uses the input.vpm motion capture file as input and uses
+  specifically frame 134 as the measurement frame. Output config file is written to input_tpose.yaml
+  which then later can be used to repair the input.vpm file.
+
+Step 2
+  In this step we repair the input vpm file by using the generated tpose.yaml config from step 1.
+
+  ~# ./ReMoCapDa.rb -c -i input.vpm -c input_tpose.yaml -r -o output.vpm
+
+  This command will print colorized, uses the input.vom motion capture file as input as well as
+  input_tpose.yaml which holds the necessary repair information. The program receives -r which is used to signal
+  that we want to repair the vpm file. The -o switch is used to pass along the target filename for the repaired
+  data.
+
+
+Step 3
+  Manually verify that the repaired data is good, if not repeat previous steps.
+
+
 
 `FEATURES'
 define(FEATURES,esyscmd( `cat FEATURES.in | sed -e "s/#.*//" -e "/^$/d" -e "s/^\*\*/    o /" -e "s/^\*/\n  o /"' ))

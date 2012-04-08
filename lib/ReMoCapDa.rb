@@ -45,8 +45,27 @@ class ReMoCapDa # {{{
       #
       ##########
 
-      unless( @options.tpose.nil? )
-        @logger.message( :success, "Got T-Pose frame from CLI (#{@options.tpose.to_s})" )
+      unless( @options.input_filename.nil? or @options.output_filename.nil? or @options.tpose.nil? )
+        @logger.message( :info, "Using the file (#{@options.input_filename.to_s}) as input" )
+        @logger.message( :info, "Using the file (#{@options.output_filename.to_s}) as output" )
+        @logger.message( :info, "Got T-Pose frame from CLI (#{@options.tpose.to_s})" )
+
+
+        # @logger.message( :info, "Loading tpose input into MotionX VPM Plugin ADT format" )
+        # @tpose                      = ADT.new( @options.tpose_input_filename.to_s )
+
+        @logger.message( :info, "Loading input into MotionX VPM Plugin ADT format" )
+        @input                      = ADT.new( @options.input_filename.to_s )
+
+        #@logger.message( :info, "Cropping" )
+        # This one is borked - look at ADT::processSegment
+        # @adt.crop( 1, 3 )
+        # @logger.message( :info, "Writing file" )
+        #@input.write( "/tmp/foobar.vpm" )
+
+        @logger.message( :info, "Extracting T-Pose geometry" )
+        
+
       end
 
       @logger.message( :success, "Finished #{__FILE__} run" )
@@ -74,6 +93,7 @@ class ReMoCapDa # {{{
     options.debug           = false
     options.quiet           = false
     options.tpose           = nil
+    options.tpose_input_filename = nil
     options.input_filename  = nil
     options.output_filename = nil
 
@@ -86,6 +106,7 @@ class ReMoCapDa # {{{
       opts.separator "General options:"
 
       opts.on( "-t", "--tpose OPT", "T-Pose frame used for calibration (needs frame number as argument)" ) { |frame| options.tpose = frame }
+      opts.on( "-p", "--tpose-input OPT", "T-Pose Input VPM file (including path)" ) { |filename| options.tpose_input_filename = filename }
       opts.on( "-i", "--input OPT", "Input VPM file (including path)" ) { |filename| options.input_filename = filename }
       opts.on( "-o", "--output OPT", "Output VPM file (including path)" ) { |filename| options.output_filename = filename }
 
