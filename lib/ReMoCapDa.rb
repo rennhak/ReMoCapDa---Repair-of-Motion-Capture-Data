@@ -45,10 +45,20 @@ class ReMoCapDa # {{{
       #
       ##########
 
+      # Crop Input Motion Data
       unless( @options.input_filename.nil? or @options.output_filename.nil? or @options.tpose.nil? )
         @logger.message( :info, "Using the file (#{@options.input_filename.to_s}) as input" )
         @logger.message( :info, "Using the file (#{@options.output_filename.to_s}) as output" )
         @logger.message( :info, "Got T-Pose frame from CLI (#{@options.tpose.to_s})" )
+
+        
+      end
+
+
+      # Extract repair config yaml file
+      unless( @options.input_filename.nil? or @options.output_filename.nil? or @options.tpose.nil? )
+        @logger.message( :info, "Using the file (#{@options.input_filename.to_s}) as input" )
+        @logger.message( :info, "Using the file (#{@options.output_filename.to_s}) as output" )
 
 
         # @logger.message( :info, "Loading tpose input into MotionX VPM Plugin ADT format" )
@@ -61,7 +71,7 @@ class ReMoCapDa # {{{
         # This one is borked - look at ADT::processSegment
         # @adt.crop( 1, 3 )
         # @logger.message( :info, "Writing file" )
-        #@input.write( "/tmp/foobar.vpm" )
+        # input.write( "/tmp/foobar.vpm" )
 
         @logger.message( :info, "Extracting T-Pose geometry" )
         
