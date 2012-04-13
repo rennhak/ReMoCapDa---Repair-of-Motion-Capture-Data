@@ -14,6 +14,7 @@ require 'rubygems'
 # Custom
 $:.push('.')
 require 'Logger'
+require 'Repair'
 
 # From MotionX - FIXME: Use MotionX's XYAML interface
 $:.push('../base/MotionX/src/plugins/vpm/src')
@@ -142,10 +143,8 @@ class ReMoCapDa # {{{
     yaml = read_config( @options.tpose_yaml_filename )
 
     # Determine threshhold of whats ok
-    threshhold = 2.0
-
-    # Go through markers and correct where incorrect 0..n
-    keys = yaml.instance_variable_get("@table").keys
+    # threshhold = 2.5
+    threshhold = 10
 
     @logger.message( :info, "Loading input into MotionX VPM Plugin ADT format" )
     @input                      = ADT.new( @options.input_filename.to_s )
@@ -155,7 +154,7 @@ class ReMoCapDa # {{{
 
     @logger.message( :info, "Repairing the motion capture data" )
     repair = Repair.new( @logger, yaml, threshhold )
-    @input = repair.segments( @input )
+    @input = repair.run( @input )
 
     # Localize all coordinates to pt30
     @input.local_coordinate_system_undo( :pt30 )
