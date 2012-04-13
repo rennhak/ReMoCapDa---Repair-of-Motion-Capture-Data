@@ -6,6 +6,7 @@
 require 'optparse' 
 require 'optparse/time' 
 require 'ostruct'
+require 'yaml'
 
 # System Extensions
 require 'rubygems'
@@ -74,20 +75,48 @@ class ReMoCapDa # {{{
     raise ArgumentError, "Input filename cannot be nil" if( @options.input_filename.nil? )
     raise ArgumentError, "Output filename cannot be nil" if( @options.output_filename.nil? )
     raise ArgumentError, "We cannot extract a yaml config and have -y given at the same time!" unless( @options.tpose_yaml_filename.nil? )
-    raise ArgumentError, "T-Pose frame range cannot be nil" if( @options.tpose.nil? )
+    raise ArgumentError, "From frame cannot be nil" if( @options.from.nil? )
+    raise ArgumentError, "To frame cannot be nil" if( @options.to.nil? )
+    raise ArgumentError, "Output file should end in the file extension .yaml" unless( @options.output_filename.split(".").last.to_s == "yaml" )
 
-    @logger.message( :info, "Extracting yaml config from input (#{@options.input_filename.to_s}) and outputting it to (#{@options.output_filename}) for frames (#{@options.tpose.join( ', ')})" )
+    @logger.message( :info, "Extracting yaml config from input (#{@options.input_filename.to_s}) and outputting it to (#{@options.output_filename}) for frames (#{@options.from.to_s}, #{@options.to.to_s})" )
 
     @logger.message( :info, "Loading input into MotionX VPM Plugin ADT format" )
     @input                      = ADT.new( @options.input_filename.to_s )
 
     # take all potential t-pose frames and calculate average
+    @logger.message( :info, "For calculations, cropping to provided frame range" )
+    @input.crop( @options.from, @options.to )
+
+    # Create average pose from all input input markers (maybe not a good idea?)
+    @input.combine
+
+    # Localize all coordinates to pt30
+    @input.local_coordinate_system( :pt30 )
+
+    # store current marker information in yaml for later
+    segments = Hash.new
+    @input.segments.each do |segment|
+      segments[ segment.to_s ] = Hash.new if( segments[ segment.to_s ].nil? )
+
+      %w[xtran ytran ztran].each do |i|
+        s         = @input.instance_variable_get( "@#{segment.to_s}" )
+        i_array   = ( s.instance_variable_get( "@#{i.to_s}" ) )
+
+        raise ArgumentError, "i_array can only be 1 long" unless( i_array.length == 1 )
+
+        segments[ segment.to_s ][ i.to_s ] = i_array.first
+      end
+    end
+
+    yaml = segments.to_yaml
 
     # store this data to yaml
+    @logger.message( :info, "Writing file" )
+    File.open( @options.output_filename.to_s, "w" ) { |f| f.write( yaml ) }
 
-    # calculate angles and other constant features to correct incorrect markers
-
-
+    @logger.message( :success, "Finished writing of yaml - success" )
+    exit
   end # of def extract_config # }}}
 
 
