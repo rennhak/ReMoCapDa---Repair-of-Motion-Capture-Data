@@ -99,13 +99,19 @@ class ReMoCapDa # {{{
     @input.segments.each do |segment|
       segments[ segment.to_s ] = Hash.new if( segments[ segment.to_s ].nil? )
 
-      %w[xtran ytran ztran].each do |i|
+      # %w[xtran ytran ztran  ].each do |i|
+      order = @input.instance_variable_get( "@#{segment.to_s}" ).order
+
+      order.each do |i|
         s         = @input.instance_variable_get( "@#{segment.to_s}" )
         i_array   = ( s.instance_variable_get( "@#{i.to_s}" ) )
 
-        raise ArgumentError, "i_array can only be 1 long" unless( i_array.length == 1 )
+        raise ArgumentError, "i_array can only be 1 long" unless( i_array.length <= 1 )
 
-        segments[ segment.to_s ][ i.to_s ] = i_array.first
+        value = i_array.first
+        value = 0.0 if( i_array.length == 0 )
+
+        segments[ segment.to_s ][ i.to_s ] = value
       end
     end
 
@@ -133,14 +139,32 @@ class ReMoCapDa # {{{
     @logger.message( :info, "Repairing motion stream (#{@options.input_filename.to_s}) using the repair config (#{@options.tpose_yaml_filename.to_s}) and outputting it to (#{@options.output_filename})" )
 
     # Take input config and load
+    yaml = read_config( @options.tpose_yaml_filename )
 
     # Determine threshhold of whats ok
+    threshhold = 2.0
 
     # Go through markers and correct where incorrect 0..n
+    keys = yaml.instance_variable_get("@table").keys
+
+    @logger.message( :info, "Loading input into MotionX VPM Plugin ADT format" )
+    @input                      = ADT.new( @options.input_filename.to_s )
+
+    # Localize all coordinates to pt30
+    @input.local_coordinate_system( :pt30 )
+
+    @logger.message( :info, "Repairing the motion capture data" )
+    repair = Repair.new( @logger, yaml, threshhold )
+    @input = repair.segments( @input )
+
+    # Localize all coordinates to pt30
+    @input.local_coordinate_system_undo( :pt30 )
 
     # Store result to disk
+    @logger.message( :info, "Writing file" )
+    @input.write( @options.output_filename.to_s )
 
-
+    @logger.message( :success, "Finished, exiting" )
   end # of def repair_input # }}}
 
 
@@ -169,6 +193,52 @@ class ReMoCapDa # {{{
     @logger.message( :success, "Finished, exiting" )
     exit
   end # of def crop # }}}
+
+
+  # Reads a YAML config
+  #
+  # @param    [String]      filename    String, representing the filename and path to the config file
+  # @returns  [OpenStruct]              Returns an openstruct containing the contents of the YAML read config file (uses the feature of Extension.rb)
+  def read_config filename # {{{
+
+    # Pre-condition check
+    raise ArgumentError, "Filename argument should be of type string, but it is (#{filename.class.to_s})" unless( filename.is_a?(String) )
+
+    # Main
+    @logger.message :debug, "Loading this config file: #{filename.to_s}"
+    result = File.open( filename, "r" ) { |file| YAML.load( file ) }                 # return proc which is in this case a hash
+    result = hashes_to_ostruct( result ) 
+
+    # Post-condition check
+    raise ArgumentError, "The function should return an OpenStruct, but instead returns a (#{result.class.to_s})" unless( result.is_a?( OpenStruct ) )
+
+    result
+  end # }}}
+
+
+  # This function turns a nested hash into a nested open struct
+  #
+  # @author Dave Dribin
+  # Reference: http://www.dribin.org/dave/blog/archives/2006/11/17/hashes_to_ostruct/
+  #
+  # @param    [Object]    object    Value can either be of type Hash or Array, if other then it is returned and not changed
+  # @returns  [OStruct]             Returns nested open structs
+  def hashes_to_ostruct object # {{{
+
+    return case object
+    when Hash
+      object = object.clone
+      object.each { |key, value| object[key] = hashes_to_ostruct(value) }
+      OpenStruct.new( object )
+    when Array
+      object = object.clone
+      object.map! { |i| hashes_to_ostruct(i) }
+    else
+      object
+    end
+
+  end # of def hashes_to_ostruct }}}
+
 
 
   # @fn         def parse_cmd_arguments( args ) # {{{
