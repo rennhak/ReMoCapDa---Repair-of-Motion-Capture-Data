@@ -76,27 +76,225 @@ class Repair
       # Turn hash into proper ostruct
       data = hashes_to_ostruct( data )
 
-      @logger.message( :debug, "[ Frame: #{frame_index.to_s} ] Checking if head needs repair" )
+      @logger.message( :debug, "[ Frame: #{frame_index.to_s} ]" )
+      @logger.message( :debug, "\tChecking if head needs repair" )
       # Do checking and repair
       if( repair_head?( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 ) )
         @logger.message( :warning, "Repairing head at frame (#{frame_index.to_s})" )
 
         lfhd, lbhd, rfhd, rbhd, pt24 = repair_head!( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
 
-
         %w[lfhd lbhd rfhd rbhd pt24].each do |marker|
           eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
           eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
           eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
         end
+      end # of repair_head
 
-      end
- 
+      @logger.message( :debug, "\tChecking if hand needs repair" )
+
+      if( repair_hand?( data.rwra, data.rwrb, data.lwra, data.lwrb, data.lfin, data.rfin, 2 ) )
+        @logger.message( :warning, "Repairing hand at frame (#{frame_index.to_s})" )
+
+        rwra, rwrb, lwra, lwrb, lfin, rfin = repair_hand!( data.rwra, data.rwrb, data.lwra, data.lwra, data.lfin, data.rfin )
+
+        %w[rwra rwrb lwra lwrb lfin rfin].each do |marker|
+          eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
+          eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
+          eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
+        end
+
+      end # of repair_hand
+
+
     end # of 0.upto( frames - 1 )
 
     # Return result
     result
   end # of def run # }}}
+
+
+  # @fn       def repair_hand?  # {{{
+  # @brief    Checks if the hand markers need repairing
+  def repair_hand? rwra = nil, rwrb = nil, lwra = nil, lwrb = nil, lfin = nil, rfin = nil, threshhold = @threshhold
+
+    # check sanity
+    raise ArgumentError, "rwra can't be nil" if( rwra.nil? )
+    raise ArgumentError, "rwrb can't be nil" if( rwrb.nil? )
+    raise ArgumentError, "lwra can't be nil" if( lwra.nil? )
+    raise ArgumentError, "lwrb can't be nil" if( lwrb.nil? )
+    raise ArgumentError, "lfin can't be nil" if( lfin.nil? )
+    raise ArgumentError, "rfin can't be nil" if( rfin.nil? )
+
+    result = false
+    frame_hand = []
+    yaml_frame_hand = []
+
+
+    # Fingers
+    frame_hand << rfin_rwra_distance = eucledian_distance( rfin[0,3], rwra[0,3] )
+    frame_hand << rfin_rwrb_distance = eucledian_distance( rfin[0,3], rwrb[0,3] )
+
+    frame_hand << lfin_lwra_distance = eucledian_distance( lfin[0,3], lwra[0,3] )
+    frame_hand << lfin_lwrb_distance = eucledian_distance( lfin[0,3], lwrb[0,3] )
+
+    # Wrist
+    frame_hand << rwra_rwrb_distance = eucledian_distance( rwra[0,3], rwra[0,3] )
+    frame_hand << lwra_lwrb_distance = eucledian_distance( lwrb[0,3], lwrb[0,3] )
+
+    
+    # Fingers
+    yaml_frame_hand << yaml_rfi_lb_distance = eucledian_distance( get_array( @yaml.lfhd ), get_array( @yaml.lbhd ) )
+
+    # Fingers
+    yaml_frame_hand << yaml_rfin_rwra_distance = eucledian_distance( get_array( @yaml.rfin), get_array( @yaml.rwra ) )
+    yaml_frame_hand << yaml_rfin_rwrb_distance = eucledian_distance( get_array( @yaml.rfin), get_array( @yaml.rwrb ) )
+
+    yaml_frame_hand << yaml_lfin_lwra_distance = eucledian_distance( get_array( @yaml.lfin), get_array( @yaml.lwra ) )
+    yaml_frame_hand << yaml_lfin_lwrb_distance = eucledian_distance( get_array( @yaml.lfin), get_array( @yaml.lwrb ) )
+
+    # Wrist
+    yaml_frame_hand << yaml_rwra_rwrb_distance = eucledian_distance( get_array( @yaml.rwra), get_array( @yaml.rwra ) )
+    yaml_frame_hand << yaml_lwra_lwrb_distance = eucledian_distance( get_array( @yaml.lwrb), get_array( @yaml.lwrb ) )
+
+    diff        = frame_hand.zip( yaml_frame_hand ).map { |x,y| (y - x).abs }
+    diff_sum    = diff.sum
+
+    if( diff_sum > threshhold )
+      result = true 
+    end
+
+    result
+  end # }}}
+
+
+
+  # @fn       def repair_hand!  # {{{
+  # @brief    Repairs hand markers
+  def repair_hand! rwra = nil, rwrb = nil, lwra = nil, lwrb = nil, lfin = nil, rfin = nil, threshhold = @threshhold
+    @logger.message( :warning, "Reparing hand" )
+
+    @rwra, @rwrb, @lwra, @lwrb, @lfin, @rfin = rwra, rwrb, lwra, lwrb, lfin, rfin
+
+    # check sanity
+    raise ArgumentError, "rwra can't be nil" if( rwra.nil? )
+    raise ArgumentError, "rwrb can't be nil" if( rwrb.nil? )
+    raise ArgumentError, "lwra can't be nil" if( lwra.nil? )
+    raise ArgumentError, "lwrb can't be nil" if( lwrb.nil? )
+    raise ArgumentError, "lfin can't be nil" if( lfin.nil? )
+    raise ArgumentError, "rfin can't be nil" if( rfin.nil? )
+
+    result = false
+    @frame_hand = []
+    yaml_frame_hand = []
+
+
+    # Fingers
+    @frame_hand << rfin_rwra_distance = eucledian_distance( @rfin[0,3], @rwra[0,3] )
+    @frame_hand << rfin_rwrb_distance = eucledian_distance( @rfin[0,3], @rwrb[0,3] )
+
+    @frame_hand << lfin_lwra_distance = eucledian_distance( @lfin[0,3], @lwra[0,3] )
+    @frame_hand << lfin_lwrb_distance = eucledian_distance( @lfin[0,3], @lwrb[0,3] )
+
+    # Wrist
+    @frame_hand << rwra_rwrb_distance = eucledian_distance( @rwra[0,3], @rwra[0,3] )
+    @frame_hand << lwra_lwrb_distance = eucledian_distance( @lwrb[0,3], @lwrb[0,3] )
+
+    # Fingers
+    yaml_frame_hand << yaml_rfin_rwra_distance = eucledian_distance( get_array( @yaml.rfin), get_array( @yaml.rwra ) )
+    yaml_frame_hand << yaml_rfin_rwrb_distance = eucledian_distance( get_array( @yaml.rfin), get_array( @yaml.rwrb ) )
+
+    yaml_frame_hand << yaml_lfin_lwra_distance = eucledian_distance( get_array( @yaml.lfin), get_array( @yaml.lwra ) )
+    yaml_frame_hand << yaml_lfin_lwrb_distance = eucledian_distance( get_array( @yaml.lfin), get_array( @yaml.lwrb ) )
+
+    # Wrist
+    yaml_frame_hand << yaml_rwra_rwrb_distance = eucledian_distance( get_array( @yaml.rwra), get_array( @yaml.rwra ) )
+    yaml_frame_hand << yaml_lwra_lwrb_distance = eucledian_distance( get_array( @yaml.lwrb), get_array( @yaml.lwrb ) )
+
+    @diff        = @frame_hand.zip( yaml_frame_hand ).map { |x,y| (y - x).abs }
+    @diff_sum    = @diff.sum
+
+    # find out which distance is ok
+    @good_distance = []  # true == length is ok
+    @diff.each do |n| 
+
+      p n
+      p threshhold
+
+      @good_distance << ( n < threshhold ) ? ( false ) : ( true ) 
+
+    end
+
+    p @good_distance
+    p @diff
+    p @diff_sum
+
+    # Iterate over markers until repaired
+    while( @good_distance.include?( false ) )
+
+      @frame_hand = []
+
+      @logger.message( :debug, "Iterating over good distance check for hand frame until it is fixed" )
+
+      # Fingers
+      @frame_hand << rfin_rwra_distance = eucledian_distance( @rfin[0,3], @rwra[0,3] )
+      @frame_hand << rfin_rwrb_distance = eucledian_distance( @rfin[0,3], @rwrb[0,3] )
+
+      @frame_hand << lfin_lwra_distance = eucledian_distance( @lfin[0,3], @lwra[0,3] )
+      @frame_hand << lfin_lwrb_distance = eucledian_distance( @lfin[0,3], @lwrb[0,3] )
+
+      # Wrist
+      @frame_hand << rwra_rwrb_distance = eucledian_distance( @rwra[0,3], @rwra[0,3] )
+      @frame_hand << lwra_lwrb_distance = eucledian_distance( @lwrb[0,3], @lwrb[0,3] )
+
+
+      @diff        = @frame_hand.zip( yaml_frame_hand ).map { |x,y| (y - x).abs }
+
+      # find out which distance is ok
+      @good_distance = []
+      @diff.each { |n| @good_distance << ( n < threshhold ) ? ( false ) : ( true ) } 
+
+      break unless( @good_distance.include?( false ) )
+
+      if( @good_distance[0] )  # rfin <-> rwra is ok
+        raise NotImplementedError
+        next
+      end
+
+      if( @good_distance[1] )  # rfin <-> rwrb is ok
+        @logger.message( :warning," ---> Repair" )
+        @rwra[0]  = @rwrb[0] - (@yaml.rwrb.xtran.abs - @yaml.rwra.xtran.abs)
+        @rwra[1]  = @rwrb[1]
+        @rwra[2]  = @rwrb[2]
+
+        next
+      end
+
+      if( @good_distance[2] )  # lfin <-> lwra is ok
+        raise NotImplementedError
+        next
+      end
+ 
+      if( @good_distance[3] )  # lfin <-> lwrb is ok
+        raise NotImplementedError
+        next
+      end
+
+      if( @good_distance[4] )  # rwra <-> rwrb is ok
+        raise NotImplementedError
+        next
+      end
+
+      if( @good_distance[5] )  # lwra lwrb is ok
+        raise NotImplementedError
+        next
+      end
+
+    end # of while
+
+    [ @rwra, @rwrb, @lwra, @lwrb, @lfin, @rfin ]
+  end # }}}
+
 
 
   # @fn       def repair_head? lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil # {{{
@@ -229,7 +427,15 @@ class Repair
       break unless( @good_distance.include?( false ) )
 
       if( @good_distance[0] )  # lfhd <-> lbhd is ok
-        raise NotImplementedError
+
+        @rfhd[0]  = @lfhd[0] - (@yaml.lfhd.xtran.abs - @yaml.rfhd.xtran.abs)
+        @rfhd[1]  = @lfhd[1]
+        @rfhd[2]  = @lfhd[2]
+
+        @rbhd[0]  = @lbhd[0] - (@yaml.lbhd.xtran.abs - @yaml.rbhd.xtran.abs)
+        @rbhd[1]  = @lbhd[1]
+        @rbhd[2]  = @lbhd[2]
+
         next
       end
 
@@ -247,16 +453,22 @@ class Repair
         #   o     o
         # lbhd   rbhd
 
-        # half = @frame_head[ 1 ]  / 2.0
+        @lfhd[0]  = @rfhd[0] - (@yaml.rfhd.xtran.abs - @yaml.lfhd.xtran.abs)
+        @lfhd[1]  = @rfhd[1]
+        @lfhd[2]  = @rfhd[2]
+
+        @lbhd[0]  = @rbhd[0] - (@yaml.rbhd.xtran.abs - @yaml.lbhd.xtran.abs)
+        @lbhd[1]  = @rbhd[1]
+        @lbhd[2]  = @rbhd[2]
 
         # This is a naive method
-        @lfhd[0]  = @yaml.lfhd.xtran
-        @lfhd[1]  = @yaml.lfhd.ytran
-        @lfhd[2]  = @yaml.lfhd.ztran
+        #@lfhd[0]  = @yaml.lfhd.xtran
+        #@lfhd[1]  = @yaml.lfhd.ytran
+        #@lfhd[2]  = @yaml.lfhd.ztran
 
-        @lbhd[0]  = @yaml.lbhd.xtran
-        @lbhd[1]  = @yaml.lbhd.ytran
-        @lbhd[2]  = @yaml.lbhd.ztran
+        #@lbhd[0]  = @yaml.lbhd.xtran
+        #@lbhd[1]  = @yaml.lbhd.ytran
+        #@lbhd[2]  = @yaml.lbhd.ztran
 
         next
       end
@@ -264,12 +476,20 @@ class Repair
       if( @good_distance[2] )  # lfhd <-> rfhd is ok
         @logger.message( :debug, "Distance lfhd<->rfhd is ok, using this as a basis" )
 
+        @lbhd[0]  = @lfhd[0]
+        #@lbhd[1]  = @lfhd[1]
+        #@lbhd[2]  = @lfhd[2] - (@yaml.lfhd.ztran.abs - @yaml.lbhd.ztran.abs)
+
+        @rbhd[0]  = @rfhd[0]
+        #@rbhd[1]  = @rfhd[1]
+        #@rbhd[2]  = @rfhd[2] - (@yaml.rfhd.ztran.abs - @yaml.rbhd.ztran.abs)
+
         # This is a naive method
-        @lbhd[0]  = @yaml.lbhd.xtran
+        # @lbhd[0]  = @yaml.lbhd.xtran
         @lbhd[1]  = @yaml.lbhd.ytran
         @lbhd[2]  = @yaml.lbhd.ztran
 
-        @rbhd[0]  = @yaml.rbhd.xtran
+        # @rbhd[0]  = @yaml.rbhd.xtran
         @rbhd[1]  = @yaml.rbhd.ytran
         @rbhd[2]  = @yaml.rbhd.ztran
 
