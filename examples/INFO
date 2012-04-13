@@ -1,0 +1,8 @@
+
+
+# Extract config yaml for repair
+./ReMoCapDa.rb -c -e -i ~/universities/todai/data/DanceData/Aizu_Wakamatsu_Experiments/igarashi/Igarashi_-_S100_-_T_Pose.vpm -o igarashi.yaml -f 0 -t 500
+
+# Repair
+./ReMoCapDa.rb -r -i ~/universities/todai/data/DanceData/Aizu_Wakamatsu_Experiments/igarashi/Igarashi_-_S100_-_Cycle_02.vpm -o Igarashi_-_S100_-_Cycle_02.vpm -c -y igarashi.yaml
+
