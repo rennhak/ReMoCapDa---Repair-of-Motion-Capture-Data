@@ -81,8 +81,11 @@ class ReMoCapDa # {{{
     @logger.message( :info, "Loading input into MotionX VPM Plugin ADT format" )
     @input                      = ADT.new( @options.input_filename.to_s )
 
-    # take all frames and calculate average
-    
+    # take all potential t-pose frames and calculate average
+
+    # store this data to yaml
+
+    # calculate angles and other constant features to correct incorrect markers
 
 
   end # of def extract_config # }}}
@@ -100,24 +103,42 @@ class ReMoCapDa # {{{
 
     @logger.message( :info, "Repairing motion stream (#{@options.input_filename.to_s}) using the repair config (#{@options.tpose_yaml_filename.to_s}) and outputting it to (#{@options.output_filename})" )
 
+    # Take input config and load
+
+    # Determine threshhold of whats ok
+
+    # Go through markers and correct where incorrect 0..n
+
+    # Store result to disk
+
+
   end # of def repair_input # }}}
 
 
   # @fn         def crop # {{{
   # @brief      Crop takes a input and crops out given a specific frame region and outputs the result to a give output file
   def crop
+
+    # Sanity check guards
+    raise ArgumentError, "Input filename cannot be nil" if( @options.input_filename.nil? )
+    raise ArgumentError, "Output filename cannot be nil" if( @options.output_filename.nil? )
+    raise ArgumentError, "Yaml config filename must be nil" unless( @options.tpose_yaml_filename.nil? )
+    raise ArgumentError, "From frame cannot be nil" if( @options.from.nil? )
+    raise ArgumentError, "To frame cannot be nil" if( @options.to.nil? )
+
+    @logger.message( :info, "Cropping motion stream (#{@options.input_filename.to_s}) from (#{@options.from.to_s}) to (#{@options.to.to_s}) and outputting it to (#{@options.output_filename})" )
+
     @logger.message( :info, "Loading input into MotionX VPM Plugin ADT format" )
     @input                      = ADT.new( @options.input_filename.to_s )
 
-    raise NotImplementedError
-
     # MotionX Needs fixing for this to work
     @logger.message( :info, "Cropping" )
-    # This one is borked - look at ADT::processSegment
-    # @adt.crop( 1, 3 )
-    # @logger.message( :info, "Writing file" )
-    # input.write( "/tmp/foobar.vpm" )
+    @input.crop( @options.from, @options.to )
+    @logger.message( :info, "Writing file" )
+    @input.write( @options.output_filename.to_s )
 
+    @logger.message( :success, "Finished, exiting" )
+    exit
   end # of def crop # }}}
 
 
@@ -142,6 +163,9 @@ class ReMoCapDa # {{{
     options.input_filename          = nil # input  | motion data
     options.output_filename         = nil # output | motion data OR yaml config
 
+    options.from                    = nil
+    options.to                      = nil
+
     # Boolean swtiches for control flow
     options.crop                    = false
     options.extract_config          = false
@@ -155,55 +179,12 @@ class ReMoCapDa # {{{
       opts.separator ""
       opts.separator "General options:"
 
-      opts.on( "-t", "--tpose OPT", "T-Pose frame used for calibration (needs frame number as argument, e.g. OPT := \"5-42\")" ) do |frame|
-        # check that we only get 1 "-" not more
-        if( frame.scan("-").length != 1 )
-          puts "Couldn't understand the -t input, please check help for information on the formatting"
-          exit
-        else
-          tmp               = frame.split("-")
-          first, second     = tmp.first.to_i, tmp.last.to_i
-
-          if( first == 0 or second == 0 )
-            puts "Parameters can only be Numeric or start from 1"
-            exit
-          end
-
-          if( tmp.first.to_i > tmp.last.to_i )
-            puts "First parameter of -t must be smaller than the second one"
-            exit
-          end
-        end
-
-        options.tpose = ( frame.split( "-" ) ).collect!{ |n| n.to_i }
-      end
-
-#      opts.on( "--crop OPT", "Crop frames from input stream and send to output file (e.g. OPT := \"5-42\")" ) do |frame|
-#        # check that we only get 1 "-" not more
-#        if( frame.scan("-").length != 1 )
-#          puts "Couldn't understand the --crop input, please check help for information on the formatting"
-#          exit
-#        else
-#          tmp               = frame.split("-")
-#          first, second     = tmp.first.to_i, tmp.last.to_i
-#
-#          if( first == 0 or second == 0 )
-#            puts "Parameters can only be Numeric or start from 1"
-#            exit
-#          end
-#
-#          if( tmp.first.to_i > tmp.last.to_i )
-#            puts "First parameter of -t must be smaller than the second one"
-#            exit
-#          end
-#        end
-#
-#        options.tpose = ( frame.split( "-" ) ).collect!{ |n| n.to_i }
-#      end
-
-
       # Boolean
       opts.on( "-x", "--crop", "Crop Input Motion stream (needs also --from and --to)" ) { |crop| options.crop = crop }
+
+      opts.on( "-f", "--from OPT", "From frame" ) { |frame| options.from = frame.to_i }
+      opts.on( "-t", "--to OPT", "To frame" ) { |frame| options.to = frame.to_i }
+
       opts.on( "-e", "--extract-config", "Extract config yaml from input data (needs also --tpose)" ) { |c| options.extract_config = c }
       opts.on( "-r", "--repair-input", "Repair input motion file (nees also extracted yaml config)" ) { |c| options.repair_input = c }
 
