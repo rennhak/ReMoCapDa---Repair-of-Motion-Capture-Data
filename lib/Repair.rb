@@ -18,7 +18,9 @@
 #######
 
 
+# Libaries
 $:.push('.')
+require 'Helpers.rb'
 
 
 # @class      class Repair # {{{
@@ -27,6 +29,10 @@ class Repair
 
   # @fn       def initialize # {{{
   # @brief    Default constructor of the Repair class
+  #
+  # @param    [Logger]        logger        Logger class
+  # @param    [OpenStruct]    yaml          OpenStruct containing the loaded yaml
+  # @param    [Fixnum]        threshhold    Threshhold for the repair detection
   def initialize logger = nil, yaml = nil, threshhold = nil
 
     # Sanity check
@@ -46,7 +52,13 @@ class Repair
 
   # @fn       def run
   # @brief    Run checks the motion data for problems and tries to repair it
-  def run motion_capture_data
+  #
+  # @param    [ADT]     motion_capture_data       Motion Capture class MotionX::ADT
+  def run motion_capture_data = nil
+
+    # Sanity check
+    raise ArgumentError, "Motion capture data cannot be nil" if( motion_capture_data.nil? )
+
     @logger.message( :info, "Running repair" )
 
     result    = motion_capture_data
@@ -74,7 +86,7 @@ class Repair
       end # of segments.each
 
       # Turn hash into proper ostruct
-      data = hashes_to_ostruct( data )
+      data = Helpers.new.hashes_to_ostruct( data )
 
       @logger.message( :debug, "[ Frame: #{frame_index.to_s} ]" )
       @logger.message( :debug, "\tChecking if head needs repair" )
@@ -106,7 +118,6 @@ class Repair
 
       end # of repair_hand
 
-
     end # of 0.upto( frames - 1 )
 
     # Return result
@@ -114,8 +125,18 @@ class Repair
   end # of def run # }}}
 
 
-  # @fn       def repair_hand?  # {{{
-  # @brief    Checks if the hand markers need repairing
+  # @fn         def repair_hand?  # {{{
+  # @brief      Checks if the hand markers need repairing
+  #
+  # @param      [Array]         rwra        Array for the rwra marker
+  # @param      [Array]         rwrb        Array for the rwrb marker
+  # @param      [Array]         lwra        Array for the lwra marker
+  # @param      [Array]         lwrb        Array for the lwrb marker
+  # @param      [Array]         lfin        Array for the lfin marker
+  # @param      [Array]         rfin        Array for the rfin marker
+  # @param      [Fixnum]        threshhold  Threshhold to determine if a marker is broken or not
+  #
+  # @return                               Returns boolean, true if needs to be repaired, false if not.
   def repair_hand? rwra = nil, rwrb = nil, lwra = nil, lwrb = nil, lfin = nil, rfin = nil, threshhold = @threshhold
 
     # check sanity
@@ -125,6 +146,8 @@ class Repair
     raise ArgumentError, "lwrb can't be nil" if( lwrb.nil? )
     raise ArgumentError, "lfin can't be nil" if( lfin.nil? )
     raise ArgumentError, "rfin can't be nil" if( rfin.nil? )
+    raise ArgumentError, "threshhold can't be nil" if( threshhold.nil? )
+
 
     result = false
     frame_hand = []
@@ -569,30 +592,6 @@ class Repair
 
     result
   end # of def eucledian_distance point1, point2 }}}
-
-
-  # This function turns a nested hash into a nested open struct
-  #
-  # @author Dave Dribin
-  # Reference: http://www.dribin.org/dave/blog/archives/2006/11/17/hashes_to_ostruct/
-  #
-  # @param    [Object]    object    Value can either be of type Hash or Array, if other then it is returned and not changed
-  # @returns  [OStruct]             Returns nested open structs
-  def hashes_to_ostruct object # {{{
-
-    return case object
-    when Hash
-      object = object.clone
-      object.each { |key, value| object[key] = hashes_to_ostruct(value) }
-      OpenStruct.new( object )
-    when Array
-      object = object.clone
-      object.map! { |i| hashes_to_ostruct(i) }
-    else
-      object
-    end
-
-  end # of def hashes_to_ostruct }}}
 
 
 end # of class Repair }}}
