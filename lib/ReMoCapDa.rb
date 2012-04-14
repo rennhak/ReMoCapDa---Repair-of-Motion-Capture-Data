@@ -14,6 +14,7 @@ require 'rubygems'
 # Custom
 $:.push('.')
 require 'Logger'
+require 'Helpers'
 require 'Repair'
 
 # From MotionX - FIXME: Use MotionX's XYAML interface
@@ -21,13 +22,14 @@ $:.push('../base/MotionX/src/plugins/vpm/src')
 require 'ADT.rb'
 
 
-# ReMoCapDa class is a CLI interface for the sa library
-class ReMoCapDa # {{{
+# @class      class ReMoCapDa # {{{
+# @brief      ReMoCapDa class is a CLI and control interface in order to repair Human Motion Capture data
+class ReMoCapDa
 
-  # ReMoCapDa Constructor
-  #
-  # @param [OpenStruct] options Object returned from the ReMoCapDa::parse_cmd_arguments function
-  def initialize options = nil # {{{
+  # @fn         def initialize options = nil # {{{
+  # @brief      ReMoCapDa Constructor
+  # @param      [OpenStruct]    options     Object returned from the ReMoCapDa::parse_cmd_arguments function
+  def initialize options = nil
     @options              = options
 
     # Minimal configuration
@@ -46,9 +48,6 @@ class ReMoCapDa # {{{
       # Main Control Flow
       #
       ##########
-
-
-
       @logger.message( :info, "Using the file (#{@options.input_filename.to_s}) as input" )
       @logger.message( :info, "Using the file (#{@options.output_filename.to_s}) as output" )
 
@@ -164,6 +163,7 @@ class ReMoCapDa # {{{
     @input.write( @options.output_filename.to_s )
 
     @logger.message( :success, "Finished, exiting" )
+    exit
   end # of def repair_input # }}}
 
 
@@ -194,50 +194,27 @@ class ReMoCapDa # {{{
   end # of def crop # }}}
 
 
-  # Reads a YAML config
+  # @fn         def read_config filename # {{{
+  # @brief      Reads a YAML config
   #
-  # @param    [String]      filename    String, representing the filename and path to the config file
-  # @returns  [OpenStruct]              Returns an openstruct containing the contents of the YAML read config file (uses the feature of Extension.rb)
-  def read_config filename # {{{
+  # @param      [String]      filename    String, representing the filename and path to the config file
+  # @returns    [OpenStruct]              Returns an openstruct containing the contents of the YAML read config file (uses the feature of Extension.rb)
+  def read_config filename = nil
 
     # Pre-condition check
+    raise ArgumentError, "filename cannot be nil" if( filename.nil? )
     raise ArgumentError, "Filename argument should be of type string, but it is (#{filename.class.to_s})" unless( filename.is_a?(String) )
 
     # Main
     @logger.message :debug, "Loading this config file: #{filename.to_s}"
     result = File.open( filename, "r" ) { |file| YAML.load( file ) }                 # return proc which is in this case a hash
-    result = hashes_to_ostruct( result ) 
+    result = Helpers.new.hashes_to_ostruct( result ) 
 
     # Post-condition check
     raise ArgumentError, "The function should return an OpenStruct, but instead returns a (#{result.class.to_s})" unless( result.is_a?( OpenStruct ) )
 
     result
   end # }}}
-
-
-  # This function turns a nested hash into a nested open struct
-  #
-  # @author Dave Dribin
-  # Reference: http://www.dribin.org/dave/blog/archives/2006/11/17/hashes_to_ostruct/
-  #
-  # @param    [Object]    object    Value can either be of type Hash or Array, if other then it is returned and not changed
-  # @returns  [OStruct]             Returns nested open structs
-  def hashes_to_ostruct object # {{{
-
-    return case object
-    when Hash
-      object = object.clone
-      object.each { |key, value| object[key] = hashes_to_ostruct(value) }
-      OpenStruct.new( object )
-    when Array
-      object = object.clone
-      object.map! { |i| hashes_to_ostruct(i) }
-    else
-      object
-    end
-
-  end # of def hashes_to_ostruct }}}
-
 
 
   # @fn         def parse_cmd_arguments( args ) # {{{
@@ -317,10 +294,8 @@ end # of class ReMoCapDa }}}
 
 # Direct Invocation
 if __FILE__ == $0 # {{{
-
   options               = ReMoCapDa.new.parse_cmd_arguments( ARGV )
   remocapda             = ReMoCapDa.new( options )
-
 end # of if __FILE__ == $0 # }}}
 
 
