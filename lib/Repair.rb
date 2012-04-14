@@ -162,6 +162,8 @@ class Repair
 
     if( diff_sum > threshhold )
       result = true 
+
+      # puts "--- Diff_sum (#{diff_sum.to_s}) -> Threshhold (#{threshhold.to_s})"
     end
 
     result
@@ -212,22 +214,15 @@ class Repair
     yaml_frame_hand << yaml_lwra_lwrb_distance = eucledian_distance( get_array( @yaml.lwrb), get_array( @yaml.lwrb ) )
 
     @diff        = @frame_hand.zip( yaml_frame_hand ).map { |x,y| (y - x).abs }
-    @diff_sum    = @diff.sum
 
     # find out which distance is ok
     @good_distance = []  # true == length is ok
     @diff.each do |n| 
-
       p n
-      p threshhold
-
-      @good_distance << ( n < threshhold ) ? ( false ) : ( true ) 
-
+      @good_distance << ( n < threshhold ) ? ( true ) : ( false ) 
+      p @good_distance
+      STDIN.gets
     end
-
-    p @good_distance
-    p @diff
-    p @diff_sum
 
     # Iterate over markers until repaired
     while( @good_distance.include?( false ) )
@@ -252,7 +247,7 @@ class Repair
 
       # find out which distance is ok
       @good_distance = []
-      @diff.each { |n| @good_distance << ( n < threshhold ) ? ( false ) : ( true ) } 
+      @diff.each { |n| @good_distance << ( n > threshhold ) ? ( false ) : ( true ) } 
 
       break unless( @good_distance.include?( false ) )
 
