@@ -40,13 +40,17 @@ class Head
     raise ArgumentError, "Yaml can't be nil" if( yaml.nil? )
     raise ArgumentError, "Threshhold can't be nil" if( threshhold.nil? )
 
-    @logger       = logger
-    @yaml         = yaml
-    @threshhold   = threshhold
-    @helpers      = Helpers.new
+    @logger           = logger
+    @yaml             = yaml
+    @threshhold       = threshhold
+    @helpers          = Helpers.new
 
     # Go through markers and correct where incorrect 0..n
-    @keys         = yaml.instance_variable_get("@table").keys
+    @keys             = yaml.instance_variable_get("@table").keys
+
+
+    reference         = [ @yaml.lfhd, @yaml.lbhd, @yaml.rfhd, @yaml.rbhd ]
+    @yaml_frame_head  = get_lengths( *( reference.collect { |i| ostruct_to_array( i ) } ) )
 
   end # of def initialize }}}
 
@@ -74,79 +78,23 @@ class Head
 
     # Main control flow
     result            = false
-    frame_head        = []
-    yaml_frame_head   = []
+    yaml_frame_head   = @yaml_frame_head
 
     # get lengths of current frame for the head
     frame_head        = get_lengths( lfhd, lbhd, rfhd, rbhd )
 
-    reference         = [ @yaml.lfhd, @yaml.lbhd, @yaml.rfhd, @yaml.rbhd ]
-    yaml_frame_head   = get_lengths( *( reference.collect { |i| ostruct_to_array( i ) } ) )
-
-    p frame_head.to_a
-    p yaml_frame_head.to_a
-
-    diff        = Hash.new
+    diff              = Hash.new
     frame_head.keys.each do |k|
-      diff[ k.to_s ] = frame_head[ k ] - yaml_frame_head[ k ]
+      diff[ k.to_s ]  = frame_head[ k ] - yaml_frame_head[ k ]
     end
 
-    # diff        = frame_head.zip( yaml_frame_head ).map { |x,y| (y - x).abs }
-    diff_sum      = diff.values.inject{|sum, x| sum + x }
+    diff_sum          = diff.values.inject{|sum, x| sum + x }
 
     result = true if( diff_sum > threshhold )
 
     result
   end # }}}
 
-
-  # @fn       def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil # {{{
-  # @brief    Calculates the lengths of the marker distances by eucledian distance calculation.
-  #
-  # @param    [Array]         lfhd            Left-Front Marker on the head. Array has the shape, xtran, ytran, ztran, etc.
-  # @param    [Array]         lbhd            Left-Back Marker on the head.
-  # @param    [Array]         rfhd            Right-Front Marker on the head.
-  # @param    [Array]         rbhd            Right-Back Marker on the head.
-  #
-  # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM
-  #           Plugin. Only the first three values of the array are considered.
-  #
-  #
-  # TOP VIEW OF HEAD
-  # ================
-  #
-  #   rbhd    lbhd
-  #     x      x
-  #
-  #
-  #     x      x
-  #   rfhd    lfhd
-  #
-  def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil
-
-    # Sanity check
-    raise ArgumentError, "lfhd can't be nil" if( lfhd.nil? )
-    raise ArgumentError, "lbhd can't be nil" if( lbhd.nil? )
-    raise ArgumentError, "rfhd can't be nil" if( rfhd.nil? )
-    raise ArgumentError, "rbhd can't be nil" if( rbhd.nil? )
-
-    raise ArgumentError, "lfhd must be of type Array" unless( lfhd.is_a?( Array ) )
-    raise ArgumentError, "lbhd must be of type Array" unless( lbhd.is_a?( Array ) )
-    raise ArgumentError, "rfhd must be of type Array" unless( rfhd.is_a?( Array ) )
-    raise ArgumentError, "rbhd must be of type Array" unless( rbhd.is_a?( Array ) )
-
-    # Main control flow
-    result            = Hash.new
-
-    result[ "lf_lb" ] = @helpers.eucledian_distance( lfhd[0,3], lbhd[0,3] ) # left temple
-    result[ "rf_rb" ] = @helpers.eucledian_distance( rfhd[0,3], rbhd[0,3] ) # right temple
-    result[ "lf_rf" ] = @helpers.eucledian_distance( lfhd[0,3], rfhd[0,3] ) # forehead
-    result[ "lb_rb" ] = @helpers.eucledian_distance( lbhd[0,3], rbhd[0,3] ) # back of the head
-    result[ "lf_rb" ] = @helpers.eucledian_distance( lfhd[0,3], rbhd[0,3] ) # diagonal left front -> right back
-    result[ "lb_rf" ] = @helpers.eucledian_distance( lbhd[0,3], rfhd[0,3] ) # diagonal left back  -> right front
-
-    result
-  end # of def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil # }}}
 
 
   # @fn       def repair_head! lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil # {{{
@@ -314,7 +262,70 @@ class Head
   end # }}}
 
 
-  def ostruct_to_array openstruct
+
+  # @fn       def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil # {{{
+  # @brief    Calculates the lengths of the marker distances by eucledian distance calculation.
+  #
+  # @param    [Array]         lfhd            Left-Front Marker on the head. Array has the shape, xtran, ytran, ztran, etc.
+  # @param    [Array]         lbhd            Left-Back Marker on the head.
+  # @param    [Array]         rfhd            Right-Front Marker on the head.
+  # @param    [Array]         rbhd            Right-Back Marker on the head.
+  #
+  # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM
+  #           Plugin. Only the first three values of the array are considered.
+  #
+  #
+  # TOP VIEW OF HEAD
+  # ================
+  #
+  #   rbhd    lbhd
+  #     x      x
+  #
+  #
+  #     x      x
+  #   rfhd    lfhd
+  #
+  def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil
+
+    # Sanity check
+    raise ArgumentError, "lfhd can't be nil" if( lfhd.nil? )
+    raise ArgumentError, "lbhd can't be nil" if( lbhd.nil? )
+    raise ArgumentError, "rfhd can't be nil" if( rfhd.nil? )
+    raise ArgumentError, "rbhd can't be nil" if( rbhd.nil? )
+
+    raise ArgumentError, "lfhd must be of type Array" unless( lfhd.is_a?( Array ) )
+    raise ArgumentError, "lbhd must be of type Array" unless( lbhd.is_a?( Array ) )
+    raise ArgumentError, "rfhd must be of type Array" unless( rfhd.is_a?( Array ) )
+    raise ArgumentError, "rbhd must be of type Array" unless( rbhd.is_a?( Array ) )
+
+    # Main control flow
+    result            = Hash.new
+
+    result[ "lf_lb" ] = @helpers.eucledian_distance( lfhd[0,3], lbhd[0,3] ) # left temple
+    result[ "rf_rb" ] = @helpers.eucledian_distance( rfhd[0,3], rbhd[0,3] ) # right temple
+    result[ "lf_rf" ] = @helpers.eucledian_distance( lfhd[0,3], rfhd[0,3] ) # forehead
+    result[ "lb_rb" ] = @helpers.eucledian_distance( lbhd[0,3], rbhd[0,3] ) # back of the head
+    result[ "lf_rb" ] = @helpers.eucledian_distance( lfhd[0,3], rbhd[0,3] ) # diagonal left front -> right back
+    result[ "lb_rf" ] = @helpers.eucledian_distance( lbhd[0,3], rfhd[0,3] ) # diagonal left back  -> right front
+
+    result
+  end # of def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil # }}}
+
+
+  # @fn       def ostruct_to_array openstruct # {{{
+  # @brief    Turns a provided ostruct of the shape MotionX::VPM into a array, where only the first
+  #           three values are considered (xtran, ytran, ztran)
+  #
+  # @param    [OpenStruct]      openstruct        OpenStruct, containing the keys xtran, ytran, ztran. Rest gets ignored.
+  #
+  # @returns  [Array]                             Returns array of the form [xtran, ytran, ztran]
+  def ostruct_to_array openstruct = nil
+
+    # Sanity check
+    raise ArgumentError, "openstruct cannot be nil" if( openstruct.nil? )
+    raise ArgumentError, "openstruct needs to be of type OStruct" unless( openstruct.is_a?( OStruct ) )
+
+    # Main flow
     result = []
 
     result << openstruct.xtran
@@ -322,7 +333,7 @@ class Head
     result << openstruct.ztran
 
     result
-  end
+  end # }}}
 
 
 
