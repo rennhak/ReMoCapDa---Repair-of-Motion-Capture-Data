@@ -143,7 +143,7 @@ class ReMoCapDa
 
     # Determine threshhold of whats ok
     # threshhold = 2.5
-    threshhold = 10
+    threshhold = 20
 
     @logger.message( :info, "Loading input into MotionX VPM Plugin ADT format" )
     @input                      = ADT.new( @options.input_filename.to_s )

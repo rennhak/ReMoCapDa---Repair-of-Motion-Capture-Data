@@ -102,10 +102,12 @@ class Repair
       @logger.message( :debug, "\tChecking if head needs repair" )
 
       # Do checking and repair
-      if( @head.repair_head?( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 ) )
+      @head.set_markers( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
+
+      if( @head.repair_head? )
         @logger.message( :warning, "Repairing head at frame (#{frame_index.to_s})" )
 
-        lfhd, lbhd, rfhd, rbhd, pt24 = @head.repair_head!( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
+        lfhd, lbhd, rfhd, rbhd, pt24 = @head.repair_head!
 
         %w[lfhd lbhd rfhd rbhd pt24].each do |marker|
           eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )

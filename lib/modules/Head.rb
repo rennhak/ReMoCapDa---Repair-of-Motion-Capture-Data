@@ -47,17 +47,23 @@ class Head
 
     # Go through markers and correct where incorrect 0..n
     @keys             = yaml.instance_variable_get("@table").keys
-
+    @order            = [ "lf_lb", "rf_rb", "lf_rf", "lb_rb", "lf_rb", "lb_rf" ]
 
     reference         = [ @yaml.lfhd, @yaml.lbhd, @yaml.rfhd, @yaml.rbhd ]
     @yaml_frame_head  = get_lengths( *( reference.collect { |i| ostruct_to_array( i ) } ) )
 
     @frame_head       = nil
 
+    @lfhd             = nil
+    @lbhd             = nil
+    @rfhd             = nil
+    @rbhd             = nil
+    @pt24             = nil
+
   end # of def initialize }}}
 
 
-  # @fn       def repair_head? lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil # {{{
+  # @fn       def repair_head? lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24, threshhold = @threshhold # {{{
   # @brief    Checks if the head markers need repairing
   #
   # @param    [Array]         lfhd            Left-Front Marker on the head. Array has the shape, xtran, ytran, ztran, etc.
@@ -68,7 +74,7 @@ class Head
   # @param    [Fixnum]        threshhold      Threshhold is the value we accept as being still ok deviating from the T-Pose measurement (e.g. <10)
   #
   # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM Plugin.
-  def repair_head? lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil, threshhold = @threshhold
+  def repair_head? lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24, threshhold = @threshhold
 
     # Sanity check
     raise ArgumentError, "lfhd can't be nil" if( lfhd.nil? )
@@ -89,7 +95,7 @@ class Head
     result = true if( difference[ "sum" ] > threshhold )
 
     result
-  end # }}}
+  end # of def repair_head? lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24, threshhold = @threshhold # }}}
 
 
   # @fn       def get_difference frame = nil, reference_frame = @yaml_frame_head # {{{
@@ -124,7 +130,56 @@ class Head
   end # of def get_difference reference_frame = nil, frame = nil # }}}
 
 
-  # @fn       def repair_head! lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil # {{{
+  # @fn       def set_markers lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24 # {{{
+  # @brief    Sets markers inside the class state
+  #
+  # @param    [Array]         lfhd            Left-Front Marker on the head. Array has the shape, xtran, ytran, ztran, etc.
+  # @param    [Array]         lbhd            Left-Back Marker on the head.
+  # @param    [Array]         rfhd            Right-Front Marker on the head.
+  # @param    [Array]         rbhd            Right-Back Marker on the head.
+  # @param    [Array]         pt24            P24 is calculated and in the center of all markers (center of head).
+  # @param    [Fixnum]        threshhold      Threshhold is the value we accept as being still ok deviating from the T-Pose measurement (e.g. <10)
+  #
+  # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM Plugin.
+  def set_markers lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24
+    @lfhd, @lbhd, @rfhd, @rbhd, @pt24 = lfhd, lbhd, rfhd, rbhd, pt24
+  end # of def set_markers lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24 # }}}
+
+
+  # @fn       def done? difference = get_difference( get_lengths( @lfhd, @lbhd, @rfhd, @rbhd ) ), threshhold = @threshhold, order = @order # {{{
+  # @brief    Done takes the difference from the current to the reference coordinates (local) and if bigger than threshhold returns an array for each @order pair
+  #
+  # @param    [Hash]      difference        Output from the get_difference function
+  # @param    [Fixnum]    threshhold        Threshhold provided at the instantiation of the class
+  # @param    [Array]     order             Order of the pairs we evalutate
+  #
+  # @returns  [Array]                       Array, containing booleans in der order of the @order array
+  def done? difference = get_difference( get_lengths( @lfhd, @lbhd, @rfhd, @rbhd ) ), threshhold = @threshhold, order = @order
+
+    # holding false/true
+    result = []
+    values = []
+
+    order.each do |marker|
+      value = difference[ marker.to_s ].abs
+      values << value
+
+      if( value > threshhold )
+        result << false   # value > threshhold --> this line is not good
+      else
+        result << true    # value < threshhold --> this line is good
+      end
+
+    end # of order.each do |marker|
+
+    # p values
+    # p result
+
+    result
+  end # def done? difference = get_difference( get_lengths( @lfhd, @lbhd, @rfhd, @rbhd ) ), threshhold = @threshhold, order = @order # }}}
+
+
+  # @fn       def repair_head! lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24, threshhold = @threshhold # {{{
   # @brief    Repairs head markers
   #
   # @param    [Array]         lfhd            Left-Front Marker on the head. Array has the shape, xtran, ytran, ztran, etc.
@@ -135,7 +190,7 @@ class Head
   # @param    [Fixnum]        threshhold      Threshhold is the value we accept as being still ok deviating from the T-Pose measurement (e.g. <10)
   #
   # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM Plugin.
-  def repair_head! lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil, threshhold = @threshhold
+  def repair_head! lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24, threshhold = @threshhold
 
     # check sanity
     raise ArgumentError, "lfhd can't be nil" if( lfhd.nil? )
@@ -145,41 +200,13 @@ class Head
     raise ArgumentError, "pt24 can't be nil" if( pt24.nil? )
     raise ArgumentError, "threshhold can't be nil" if( threshhold.nil? )
 
-
-    @lfhd, @lbhd, @rfhd, @rbhd, @pt24 = lfhd, lbhd, rfhd, rbhd, pt24
-
-
-    # find out which distance is ok
-    @good_distance = []  # true == length is ok
-    @diff.each { |n| @good_distance << ( n < threshhold ) ? ( false ) : ( true ) } 
-
     # Iterate over markers until repaired
+    @good_distance = done?
     while( @good_distance.include?( false ) )
 
-      @frame_head = []
-
-      @logger.message( :debug, "Iterating over good distance check for frame until it is fixed" )
-
-      # Length of current frame
-      # length of 4 sides
-      @frame_head << lf_lb_distance = @helpers.eucledian_distance( @lfhd[0,3], @lbhd[0,3] )
-      @frame_head << rf_rb_distance = @helpers.eucledian_distance( @rfhd[0,3], @rbhd[0,3] )
-      @frame_head << lf_rf_distance = @helpers.eucledian_distance( @lfhd[0,3], @rfhd[0,3] )
-      @frame_head << lb_rb_distance = @helpers.eucledian_distance( @lbhd[0,3], @rbhd[0,3] )
-
-      @frame_head << lf_rb_distance = @helpers.eucledian_distance( @lfhd[0,3], @rbhd[0,3] )
-      @frame_head << lb_rf_distance = @helpers.eucledian_distance( @lbhd[0,3], @rfhd[0,3] )
-
-      @diff        = @frame_head.zip( yaml_frame_head ).map { |x,y| (y - x).abs }
-
-      # find out which distance is ok
-      @good_distance = []
-      @diff.each { |n| @good_distance << ( n < threshhold ) ? ( false ) : ( true ) } 
-
-      break unless( @good_distance.include?( false ) )
+      @logger.message( :debug, "Iterating over good distance check for frame until it is fixed (#{@good_distance.join( ", " )})" )
 
       if( @good_distance[0] )  # lfhd <-> lbhd is ok
-
         @rfhd[0]  = @lfhd[0] - (@yaml.lfhd.xtran.abs - @yaml.rfhd.xtran.abs)
         @rfhd[1]  = @lfhd[1]
         @rfhd[2]  = @lfhd[2]
@@ -188,6 +215,7 @@ class Head
         @rbhd[1]  = @lbhd[1]
         @rbhd[2]  = @lbhd[2]
 
+        @good_distance = done?
         next
       end
 
@@ -222,6 +250,7 @@ class Head
         #@lbhd[1]  = @yaml.lbhd.ytran
         #@lbhd[2]  = @yaml.lbhd.ztran
 
+        @good_distance = done?
         next
       end
 
@@ -245,6 +274,7 @@ class Head
         @rbhd[1]  = @yaml.rbhd.ytran
         @rbhd[2]  = @yaml.rbhd.ztran
 
+        @good_distance = done?
         next
       end
 
@@ -272,8 +302,7 @@ class Head
     @pt24[2] = ( @lfhd[2] + @lbhd[2] + @rfhd[2] + @rbhd[2] ) / 4
 
     [ @lfhd, @lbhd, @rfhd, @rbhd, @pt24 ]
-  end # }}}
-
+  end # of def repair_head! lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24, threshhold = @threshhold # }}}
 
 
   # @fn       def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil # {{{
@@ -314,12 +343,12 @@ class Head
     # Main control flow
     result            = Hash.new
 
-    result[ "lf_lb" ] = @helpers.eucledian_distance( lfhd[0,3], lbhd[0,3] ) # left temple
-    result[ "rf_rb" ] = @helpers.eucledian_distance( rfhd[0,3], rbhd[0,3] ) # right temple
-    result[ "lf_rf" ] = @helpers.eucledian_distance( lfhd[0,3], rfhd[0,3] ) # forehead
-    result[ "lb_rb" ] = @helpers.eucledian_distance( lbhd[0,3], rbhd[0,3] ) # back of the head
-    result[ "lf_rb" ] = @helpers.eucledian_distance( lfhd[0,3], rbhd[0,3] ) # diagonal left front -> right back
-    result[ "lb_rf" ] = @helpers.eucledian_distance( lbhd[0,3], rfhd[0,3] ) # diagonal left back  -> right front
+    result[ "lf_lb" ] = ( @helpers.eucledian_distance( lfhd[0,3], lbhd[0,3] ) ).abs # left temple
+    result[ "rf_rb" ] = ( @helpers.eucledian_distance( rfhd[0,3], rbhd[0,3] ) ).abs # right temple
+    result[ "lf_rf" ] = ( @helpers.eucledian_distance( lfhd[0,3], rfhd[0,3] ) ).abs # forehead
+    result[ "lb_rb" ] = ( @helpers.eucledian_distance( lbhd[0,3], rbhd[0,3] ) ).abs # back of the head
+    result[ "lf_rb" ] = ( @helpers.eucledian_distance( lfhd[0,3], rbhd[0,3] ) ).abs # diagonal left front -> right back
+    result[ "lb_rf" ] = ( @helpers.eucledian_distance( lbhd[0,3], rfhd[0,3] ) ).abs # diagonal left back  -> right front
 
     result
   end # of def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil # }}}
@@ -347,7 +376,6 @@ class Head
 
     result
   end # of def ostruct_to_array openstruct = nil # }}}
-
 
 end # of class Head }}}
 
