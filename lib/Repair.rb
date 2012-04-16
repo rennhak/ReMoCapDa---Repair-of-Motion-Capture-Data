@@ -117,19 +117,20 @@ class Repair
       end # of repair_head
 
       @logger.message( :debug, "\tChecking if hand needs repair" )
+      @hands.set_markers( data.rfin, data.rwra, data.rwrb, data.lfin, data.lwra, data.lwrb )
 
-      if( @hands.repair_hand?( data.rwra, data.rwrb, data.lwra, data.lwrb, data.lfin, data.rfin, 2 ) )
+      if( @hands.repair_hands? )
         @logger.message( :warning, "Repairing hand at frame (#{frame_index.to_s})" )
 
-        rwra, rwrb, lwra, lwrb, lfin, rfin = @hands.repair_hand!( data.rwra, data.rwrb, data.lwra, data.lwra, data.lfin, data.rfin )
+        rfin, rwra, rwrb, lfin, lwra, lwrb = @hands.repair_hands!
 
-        %w[rwra rwrb lwra lwrb lfin rfin].each do |marker|
+        %w[rfin rwra rwrb lfin lwra lwrb].each do |marker|
           eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
           eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
           eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
         end
 
-      end # of repair_hand
+      end # of repair_hands
 
     end # of 0.upto( frames - 1 )
 
