@@ -165,7 +165,6 @@ class Repair
     frame_hand << rwra_rwrb_distance = eucledian_distance( rwra[0,3], rwra[0,3] )
     frame_hand << lwra_lwrb_distance = eucledian_distance( lwrb[0,3], lwrb[0,3] )
 
-    
     # Fingers
     yaml_frame_hand << yaml_rfi_lb_distance = eucledian_distance( get_array( @yaml.lfhd ), get_array( @yaml.lbhd ) )
 
