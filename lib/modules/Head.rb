@@ -52,6 +52,8 @@ class Head
     reference         = [ @yaml.lfhd, @yaml.lbhd, @yaml.rfhd, @yaml.rbhd ]
     @yaml_frame_head  = get_lengths( *( reference.collect { |i| ostruct_to_array( i ) } ) )
 
+    @frame_head       = nil
+
   end # of def initialize }}}
 
 
@@ -78,27 +80,61 @@ class Head
 
     # Main control flow
     result            = false
-    yaml_frame_head   = @yaml_frame_head
 
     # get lengths of current frame for the head
-    frame_head        = get_lengths( lfhd, lbhd, rfhd, rbhd )
+    @frame_head       = get_lengths( lfhd, lbhd, rfhd, rbhd )
 
-    diff              = Hash.new
-    frame_head.keys.each do |k|
-      diff[ k.to_s ]  = frame_head[ k ] - yaml_frame_head[ k ]
-    end
+    difference        = get_difference( @frame_head )
 
-    diff_sum          = diff.values.inject{|sum, x| sum + x }
-
-    result = true if( diff_sum > threshhold )
+    result = true if( difference[ "sum" ] > threshhold )
 
     result
   end # }}}
 
 
+  # @fn       def get_difference frame = nil, reference_frame = @yaml_frame_head # {{{
+  # @brief    Get difference takes the reference frame (t-pose) and the current frame and calculates
+  #           the difference array for each corresponding markers as well as the sum of it for threshholding.
+  #
+  # @param    [Hash]        reference_frame     Reference frame is a hash containing all relevant head markers (from yaml)
+  # @param    [Hash]        frame               Frame is a hash containing all relevant head markers (current frame) 
+  #
+  # @returns                                    The get_difference function returns a hash containing the difference of 
+  #                                             each marker pair was well as the sum of differences stored by the
+  #                                             "sum" key.
+  def get_difference frame = nil, reference_frame = @yaml_frame_head
+    # Sanity check
+    raise ArgumentError, "reference_frame cannot be nil" if( reference_frame.nil? )
+    raise ArgumentError, "frame cannot be nil" if( frame.nil? )
+    raise ArgumentError, "reference_frame must be of type hash" unless( reference_frame.is_a?( Hash ) )
+    raise ArgumentError, "frame must be of type hash" unless( frame.is_a?( Hash ) )
+    raise ArgumentError, "Both hash key sets must align exactly" unless( reference_frame.keys == frame.keys )
+    raise ArgumentError, "Both hash key sets cannot be empty" if( reference_frame.keys.empty? or frame.keys.empty? )
+
+    # Main flow
+    result            = Hash.new
+    keys              = frame.keys
+
+    keys.each { |marker| result[ marker.to_s ] = frame[ marker.to_s ] - reference_frame[ marker.to_s ] }
+
+    difference_sum    = result.values.inject{ |sum, x| sum + x }
+    result[ "sum" ]   = difference_sum
+
+    result
+  end # of def get_difference reference_frame = nil, frame = nil # }}}
+
 
   # @fn       def repair_head! lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil # {{{
   # @brief    Repairs head markers
+  #
+  # @param    [Array]         lfhd            Left-Front Marker on the head. Array has the shape, xtran, ytran, ztran, etc.
+  # @param    [Array]         lbhd            Left-Back Marker on the head.
+  # @param    [Array]         rfhd            Right-Front Marker on the head.
+  # @param    [Array]         rbhd            Right-Back Marker on the head.
+  # @param    [Array]         pt24            P24 is calculated and in the center of all markers (center of head).
+  # @param    [Fixnum]        threshhold      Threshhold is the value we accept as being still ok deviating from the T-Pose measurement (e.g. <10)
+  #
+  # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM Plugin.
   def repair_head! lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil, threshhold = @threshhold
 
     # check sanity
@@ -107,34 +143,11 @@ class Head
     raise ArgumentError, "rfhd can't be nil" if( rfhd.nil? )
     raise ArgumentError, "rbhd can't be nil" if( rbhd.nil? )
     raise ArgumentError, "pt24 can't be nil" if( pt24.nil? )
+    raise ArgumentError, "threshhold can't be nil" if( threshhold.nil? )
 
-    @frame_head = []
-    yaml_frame_head = []
 
     @lfhd, @lbhd, @rfhd, @rbhd, @pt24 = lfhd, lbhd, rfhd, rbhd, pt24
 
-    # Length of reference frame
-    yaml_frame_head << yaml_lf_lb_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lfhd ), ostruct_to_array( @yaml.lbhd ) )
-    yaml_frame_head << yaml_rf_rb_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.rfhd ), ostruct_to_array( @yaml.rbhd ) )
-    yaml_frame_head << yaml_lf_rf_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lfhd ), ostruct_to_array( @yaml.rfhd ) )
-    yaml_frame_head << yaml_lb_rb_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lbhd ), ostruct_to_array( @yaml.rbhd ) )
-
-    # length of cross
-    yaml_frame_head << yaml_lf_rb_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lfhd ), ostruct_to_array( @yaml.rbhd ) )
-    yaml_frame_head << yaml_lb_rf_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lbhd ), ostruct_to_array( @yaml.rfhd ) )
-
-    # Length of current frame
-    # length of 4 sides
-    @frame_head << lf_lb_distance = @helpers.eucledian_distance( @lfhd[0,3], @lbhd[0,3] )
-    @frame_head << rf_rb_distance = @helpers.eucledian_distance( @rfhd[0,3], @rbhd[0,3] )
-    @frame_head << lf_rf_distance = @helpers.eucledian_distance( @lfhd[0,3], @rfhd[0,3] )
-    @frame_head << lb_rb_distance = @helpers.eucledian_distance( @lbhd[0,3], @rbhd[0,3] )
-
-    # length of cross
-    @frame_head << lf_rb_distance = @helpers.eucledian_distance( @lfhd[0,3], @rbhd[0,3] )
-    @frame_head << lb_rf_distance = @helpers.eucledian_distance( @lbhd[0,3], @rfhd[0,3] )
-
-    @diff        = @frame_head.zip( yaml_frame_head ).map { |x,y| (y - x).abs }
 
     # find out which distance is ok
     @good_distance = []  # true == length is ok
@@ -333,8 +346,7 @@ class Head
     result << openstruct.ztran
 
     result
-  end # }}}
-
+  end # of def ostruct_to_array openstruct = nil # }}}
 
 
 end # of class Head }}}
