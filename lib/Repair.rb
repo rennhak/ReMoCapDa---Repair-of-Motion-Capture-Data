@@ -54,8 +54,8 @@ class Repair
     @keys         = yaml.instance_variable_get("@table").keys
 
     # Repair modules
-    @head         = Head.new
-    @hands        = Hands.new
+    @head         = Head.new( logger, yaml, threshhold )
+    @hands        = Hands.new( logger, yaml, threshhold )
 
   end # of def initialize }}}
 

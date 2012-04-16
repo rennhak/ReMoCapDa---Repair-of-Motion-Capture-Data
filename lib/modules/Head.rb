@@ -53,53 +53,100 @@ class Head
 
   # @fn       def repair_head? lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil # {{{
   # @brief    Checks if the head markers need repairing
+  #
+  # @param    [Array]         lfhd            Left-Front Marker on the head. Array has the shape, xtran, ytran, ztran, etc.
+  # @param    [Array]         lbhd            Left-Back Marker on the head.
+  # @param    [Array]         rfhd            Right-Front Marker on the head.
+  # @param    [Array]         rbhd            Right-Back Marker on the head.
+  # @param    [Array]         pt24            P24 is calculated and in the center of all markers (center of head).
+  # @param    [Fixnum]        threshhold      Threshhold is the value we accept as being still ok deviating from the T-Pose measurement (e.g. <10)
+  #
+  # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM Plugin.
   def repair_head? lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil, threshhold = @threshhold
 
-    # check sanity
+    # Sanity check
     raise ArgumentError, "lfhd can't be nil" if( lfhd.nil? )
     raise ArgumentError, "lbhd can't be nil" if( lbhd.nil? )
     raise ArgumentError, "rfhd can't be nil" if( rfhd.nil? )
     raise ArgumentError, "rbhd can't be nil" if( rbhd.nil? )
     raise ArgumentError, "pt24 can't be nil" if( pt24.nil? )
+    raise ArgumentError, "threshhold can't be nil" if( threshhold.nil? )
 
-    result = false
-    frame_head = []
-    yaml_frame_head = []
+    # Main control flow
+    result            = false
+    frame_head        = []
+    yaml_frame_head   = []
 
+    # get lengths of current frame for the head
+    frame_head        = get_lengths( lfhd, lbhd, rfhd, rbhd )
 
-    # Length of current frame
-    # length of 4 sides
-    frame_head << lf_lb_distance = @helpers.eucledian_distance( lfhd[0,3], lbhd[0,3] )
-    frame_head << rf_rb_distance = @helpers.eucledian_distance( rfhd[0,3], rbhd[0,3] )
-    frame_head << lf_rf_distance = @helpers.eucledian_distance( lfhd[0,3], rfhd[0,3] )
-    frame_head << lb_rb_distance = @helpers.eucledian_distance( lbhd[0,3], rbhd[0,3] )
+    reference         = [ @yaml.lfhd, @yaml.lbhd, @yaml.rfhd, @yaml.rbhd ]
+    yaml_frame_head   = get_lengths( *( reference.collect { |i| ostruct_to_array( i ) } ) )
 
-    # length of cross
-    frame_head << lf_rb_distance = @helpers.eucledian_distance( lfhd[0,3], rbhd[0,3] )
-    frame_head << lb_rf_distance = @helpers.eucledian_distance( lbhd[0,3], rfhd[0,3] )
+    p frame_head.to_a
+    p yaml_frame_head.to_a
 
-    # Length of reference frame
-    yaml_frame_head << yaml_lf_lb_distance = @helpers.eucledian_distance( get_array( @yaml.lfhd ), get_array( @yaml.lbhd ) )
-    yaml_frame_head << yaml_rf_rb_distance = @helpers.eucledian_distance( get_array( @yaml.rfhd ), get_array( @yaml.rbhd ) )
-    yaml_frame_head << yaml_lf_rf_distance = @helpers.eucledian_distance( get_array( @yaml.lfhd ), get_array( @yaml.rfhd ) )
-    yaml_frame_head << yaml_lb_rb_distance = @helpers.eucledian_distance( get_array( @yaml.lbhd ), get_array( @yaml.rbhd ) )
+    diff        = Hash.new
+    frame_head.keys.each do |k|
+      diff[ k.to_s ] = frame_head[ k ] - yaml_frame_head[ k ]
+    end
 
-    # length of cross
-    yaml_frame_head << yaml_lf_rb_distance = @helpers.eucledian_distance( get_array( @yaml.lfhd ), get_array( @yaml.rbhd ) )
-    yaml_frame_head << yaml_lb_rf_distance = @helpers.eucledian_distance( get_array( @yaml.lbhd ), get_array( @yaml.rfhd ) )
-
-    diff        = frame_head.zip( yaml_frame_head ).map { |x,y| (y - x).abs }
-    diff_sum    = diff.sum
+    # diff        = frame_head.zip( yaml_frame_head ).map { |x,y| (y - x).abs }
+    diff_sum      = diff.values.inject{|sum, x| sum + x }
 
     result = true if( diff_sum > threshhold )
-    #if( result ) 
-    #  p diff
-    #  p diff_sum
-    #end
 
     result
   end # }}}
 
+
+  # @fn       def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil # {{{
+  # @brief    Calculates the lengths of the marker distances by eucledian distance calculation.
+  #
+  # @param    [Array]         lfhd            Left-Front Marker on the head. Array has the shape, xtran, ytran, ztran, etc.
+  # @param    [Array]         lbhd            Left-Back Marker on the head.
+  # @param    [Array]         rfhd            Right-Front Marker on the head.
+  # @param    [Array]         rbhd            Right-Back Marker on the head.
+  #
+  # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM
+  #           Plugin. Only the first three values of the array are considered.
+  #
+  #
+  # TOP VIEW OF HEAD
+  # ================
+  #
+  #   rbhd    lbhd
+  #     x      x
+  #
+  #
+  #     x      x
+  #   rfhd    lfhd
+  #
+  def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil
+
+    # Sanity check
+    raise ArgumentError, "lfhd can't be nil" if( lfhd.nil? )
+    raise ArgumentError, "lbhd can't be nil" if( lbhd.nil? )
+    raise ArgumentError, "rfhd can't be nil" if( rfhd.nil? )
+    raise ArgumentError, "rbhd can't be nil" if( rbhd.nil? )
+
+    raise ArgumentError, "lfhd must be of type Array" unless( lfhd.is_a?( Array ) )
+    raise ArgumentError, "lbhd must be of type Array" unless( lbhd.is_a?( Array ) )
+    raise ArgumentError, "rfhd must be of type Array" unless( rfhd.is_a?( Array ) )
+    raise ArgumentError, "rbhd must be of type Array" unless( rbhd.is_a?( Array ) )
+
+    # Main control flow
+    result            = Hash.new
+
+    result[ "lf_lb" ] = @helpers.eucledian_distance( lfhd[0,3], lbhd[0,3] ) # left temple
+    result[ "rf_rb" ] = @helpers.eucledian_distance( rfhd[0,3], rbhd[0,3] ) # right temple
+    result[ "lf_rf" ] = @helpers.eucledian_distance( lfhd[0,3], rfhd[0,3] ) # forehead
+    result[ "lb_rb" ] = @helpers.eucledian_distance( lbhd[0,3], rbhd[0,3] ) # back of the head
+    result[ "lf_rb" ] = @helpers.eucledian_distance( lfhd[0,3], rbhd[0,3] ) # diagonal left front -> right back
+    result[ "lb_rf" ] = @helpers.eucledian_distance( lbhd[0,3], rfhd[0,3] ) # diagonal left back  -> right front
+
+    result
+  end # of def get_lengths lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil # }}}
 
 
   # @fn       def repair_head! lfhd = nil, lbhd = nil, rfhd = nil, rbhd = nil, pt24 = nil # {{{
@@ -119,14 +166,14 @@ class Head
     @lfhd, @lbhd, @rfhd, @rbhd, @pt24 = lfhd, lbhd, rfhd, rbhd, pt24
 
     # Length of reference frame
-    yaml_frame_head << yaml_lf_lb_distance = @helpers.eucledian_distance( get_array( @yaml.lfhd ), get_array( @yaml.lbhd ) )
-    yaml_frame_head << yaml_rf_rb_distance = @helpers.eucledian_distance( get_array( @yaml.rfhd ), get_array( @yaml.rbhd ) )
-    yaml_frame_head << yaml_lf_rf_distance = @helpers.eucledian_distance( get_array( @yaml.lfhd ), get_array( @yaml.rfhd ) )
-    yaml_frame_head << yaml_lb_rb_distance = @helpers.eucledian_distance( get_array( @yaml.lbhd ), get_array( @yaml.rbhd ) )
+    yaml_frame_head << yaml_lf_lb_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lfhd ), ostruct_to_array( @yaml.lbhd ) )
+    yaml_frame_head << yaml_rf_rb_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.rfhd ), ostruct_to_array( @yaml.rbhd ) )
+    yaml_frame_head << yaml_lf_rf_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lfhd ), ostruct_to_array( @yaml.rfhd ) )
+    yaml_frame_head << yaml_lb_rb_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lbhd ), ostruct_to_array( @yaml.rbhd ) )
 
     # length of cross
-    yaml_frame_head << yaml_lf_rb_distance = @helpers.eucledian_distance( get_array( @yaml.lfhd ), get_array( @yaml.rbhd ) )
-    yaml_frame_head << yaml_lb_rf_distance = @helpers.eucledian_distance( get_array( @yaml.lbhd ), get_array( @yaml.rfhd ) )
+    yaml_frame_head << yaml_lf_rb_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lfhd ), ostruct_to_array( @yaml.rbhd ) )
+    yaml_frame_head << yaml_lb_rf_distance = @helpers.eucledian_distance( ostruct_to_array( @yaml.lbhd ), ostruct_to_array( @yaml.rfhd ) )
 
     # Length of current frame
     # length of 4 sides
@@ -267,7 +314,7 @@ class Head
   end # }}}
 
 
-  def get_array openstruct
+  def ostruct_to_array openstruct
     result = []
 
     result << openstruct.xtran
