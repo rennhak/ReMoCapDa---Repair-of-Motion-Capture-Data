@@ -323,7 +323,7 @@ class Head
 
     # Sanity check
     raise ArgumentError, "openstruct cannot be nil" if( openstruct.nil? )
-    raise ArgumentError, "openstruct needs to be of type OStruct" unless( openstruct.is_a?( OStruct ) )
+    raise ArgumentError, "openstruct needs to be of type OStruct" unless( openstruct.is_a?( OpenStruct ) )
 
     # Main flow
     result = []
