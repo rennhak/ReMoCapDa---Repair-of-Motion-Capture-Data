@@ -99,25 +99,25 @@ class Repair
       data = Helpers.new.hashes_to_ostruct( data )
 
       @logger.message( :debug, "[ Frame: #{frame_index.to_s} ]" )
-      @logger.message( :debug, "\tChecking if head needs repair" )
-
-      # Do checking and repair
-      @head.set_markers( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
-
-      if( @head.repair_head? )
-        @logger.message( :warning, "Repairing head at frame (#{frame_index.to_s})" )
-
-        lfhd, lbhd, rfhd, rbhd, pt24 = @head.repair_head!
-
-        %w[lfhd lbhd rfhd rbhd pt24].each do |marker|
-          eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
-          eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
-          eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
-        end
-      end # of repair_head
+#      @logger.message( :debug, "\tChecking if head needs repair" )
+#
+#      # Do checking and repair
+#      @head.set_markers( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
+#
+#      if( @head.repair_head? )
+#        @logger.message( :warning, "Repairing head at frame (#{frame_index.to_s})" )
+#
+#        lfhd, lbhd, rfhd, rbhd, pt24 = @head.repair_head!
+#
+#        %w[lfhd lbhd rfhd rbhd pt24].each do |marker|
+#          eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
+#          eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
+#          eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
+#        end
+#      end # of repair_head
 
       @logger.message( :debug, "\tChecking if hand needs repair" )
-      @hands.set_markers( data.rfin, data.rwra, data.rwrb, data.lfin, data.lwra, data.lwrb )
+      @hands.set_markers( data.rfin, data.rwra, data.rwrb, data.lfin, data.lwra, data.lwrb, data.lelb, data.relb )
 
       if( @hands.repair_hands? )
         @logger.message( :warning, "Repairing hand at frame (#{frame_index.to_s})" )

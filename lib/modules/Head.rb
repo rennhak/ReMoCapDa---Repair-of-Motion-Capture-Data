@@ -207,6 +207,33 @@ class Head
       @logger.message( :debug, "Iterating over good distance check for frame until it is fixed (#{@good_distance.join( ", " )})" )
 
       if( @good_distance[0] )  # lfhd <-> lbhd is ok
+
+
+        raise NotImplementedError
+
+        # (A) lbhd ; (B) rbhd ; C = B-A ; 
+        y_x1 = @yaml.lbhd.xtran
+        y_y1 = @yaml.lbhd.ytran
+        y_z1 = @yaml.lbhd.ztran
+
+        y_x2 = @yaml.rbhd.xtran
+        y_y2 = @yaml.rbhd.ytran
+        y_z2 = @yaml.rbhd.ztran
+
+        x1   = @lbhd[0]
+        y1   = @lbhd[1]
+        z1   = @lbhd[2]
+
+        x2   = @rbhd[0]
+        y2   = @rbhd[1]
+        z2   = @rbhd[2]
+
+        puts "yaml: lbhd (#{y_x1.to_s}, #{y_y1.to_s}, #{y_z1.to_s})  rbhd (#{y_x2.to_s}, #{y_y2.to_s}, #{y_z2.to_s})"
+        puts ""
+        puts "lbhd (#{x1.to_s}, #{y1.to_s}, #{z1.to_s})  rbhd (#{x2.to_s}, #{y2.to_s}, #{z2.to_s})"
+
+        exit
+
         @rfhd[0]  = @lfhd[0] - (@yaml.lfhd.xtran.abs - @yaml.rfhd.xtran.abs)
         @rfhd[1]  = @lfhd[1]
         @rfhd[2]  = @lfhd[2]
@@ -222,33 +249,34 @@ class Head
       if( @good_distance[1] )  # rfhd <-> rbhd is ok
         @logger.message( :debug, "Distance rfhd<->rbhd is ok, using this as a basis" )
 
-        # FIXME: Calculate angle between lines
+        difference = get_difference( get_lengths( @lfhd, @lbhd, @rfhd, @rbhd ) )
 
-        # TOP VIEW
-
-        # lfhd   rfhd
-        #   o     o
+        # Use:
+        # rfhd, rbhd, lfhd
         #
-        #      o pt24
-        #   o     o
-        # lbhd   rbhd
+        # Repair:
+        # lbhd
 
-        @lfhd[0]  = @rfhd[0] - (@yaml.rfhd.xtran.abs - @yaml.lfhd.xtran.abs)
-        @lfhd[1]  = @rfhd[1]
-        @lfhd[2]  = @rfhd[2]
+        # broken
+        # "lf_lb"=>72.41031122742238
+        # "lb_rb"=>74.02514167751507
+        # "lb_rf"=>74.92686465035351
+        
+        # Good
+        # "rf_rb"=>-0.0020435664357618677
+        # "lf_rf"=>0.03235266882107446
+        # "lf_rb"=>-0.12350072079968832
 
-        @lbhd[0]  = @rbhd[0] - (@yaml.rbhd.xtran.abs - @yaml.lbhd.xtran.abs)
-        @lbhd[1]  = @rbhd[1]
-        @lbhd[2]  = @rbhd[2]
+        # We trust the rbhd marker position
+        raise ArgumentError, "Only ok to use this if rf_rb ok" unless( difference[ "rf_rb" ].abs < 5 )
 
-        # This is a naive method
-        #@lfhd[0]  = @yaml.lfhd.xtran
-        #@lfhd[1]  = @yaml.lfhd.ytran
-        #@lfhd[2]  = @yaml.lfhd.ztran
+        dx = @yaml.rbhd.xtran - @yaml.lbhd.xtran
+        dy = @yaml.rbhd.ytran - @yaml.lbhd.ytran
+        dz = @yaml.rbhd.ztran - @yaml.lbhd.ztran
 
-        #@lbhd[0]  = @yaml.lbhd.xtran
-        #@lbhd[1]  = @yaml.lbhd.ytran
-        #@lbhd[2]  = @yaml.lbhd.ztran
+        @lbhd[0] = @rbhd[0] + dx
+        @lbhd[1] = @rbhd[1] + dy
+        @lbhd[2] = @rbhd[2] + dz
 
         @good_distance = done?
         next
@@ -257,22 +285,52 @@ class Head
       if( @good_distance[2] )  # lfhd <-> rfhd is ok
         @logger.message( :debug, "Distance lfhd<->rfhd is ok, using this as a basis" )
 
-        @lbhd[0]  = @lfhd[0]
-        #@lbhd[1]  = @lfhd[1]
-        #@lbhd[2]  = @lfhd[2] - (@yaml.lfhd.ztran.abs - @yaml.lbhd.ztran.abs)
+        difference = get_difference( get_lengths( @lfhd, @lbhd, @rfhd, @rbhd ) )
+        p difference
 
-        @rbhd[0]  = @rfhd[0]
-        #@rbhd[1]  = @rfhd[1]
-        #@rbhd[2]  = @rfhd[2] - (@yaml.rfhd.ztran.abs - @yaml.rbhd.ztran.abs)
+        # Broken
+        # "lf_lb"=>71.635095903395
+        # "rf_rb"=>75.21619749032409
+        # "lf_rb"=>69.51935660236448
+        # "lb_rf"=>74.23191658719088
+        #
+        # Good
+        # "lf_rf"=>0.03570059277488902
+        # "lb_rb"=>-4.683474578966022
 
-        # This is a naive method
-        # @lbhd[0]  = @yaml.lbhd.xtran
-        @lbhd[1]  = @yaml.lbhd.ytran
-        @lbhd[2]  = @yaml.lbhd.ztran
+        # Use
+        # lfhd, rfhd, lbhd, 
 
-        # @rbhd[0]  = @yaml.rbhd.xtran
-        @rbhd[1]  = @yaml.rbhd.ytran
-        @rbhd[2]  = @yaml.rbhd.ztran
+        # We trust the rfhd marker
+        raise ArgumentError, "Only ok to use if lf_rf ok" unless( difference[ "lf_rf" ].abs < 5 )
+
+        ref = Hash.new
+
+        %w[lfhd lbhd rbhd rfhd].each do |m|
+          tmp = []
+          tmp << eval( "@yaml.#{m.to_s}.xtran.abs - @#{m.to_s}[0].abs" )
+          tmp << eval( "@yaml.#{m.to_s}.ytran.abs - @#{m.to_s}[1].abs" )
+          tmp << eval( "@yaml.#{m.to_s}.ztran.abs - @#{m.to_s}[2].abs" )
+          tmp = tmp.sum
+          ref[ m.to_s ] = tmp
+        end
+
+        puts "ref"
+        p ref
+
+        dx = @yaml.rbhd.xtran - @yaml.rfhd.xtran
+        dy = @yaml.rbhd.ytran - @yaml.rfhd.ytran
+        dz = @yaml.rbhd.ztran - @yaml.rfhd.ztran
+
+        @rbhd[0] = @rfhd[0] - dx
+        @rbhd[1] = @rfhd[1] - dy
+        @rbhd[2] = @rfhd[2] - dz
+
+
+        difference = get_difference( get_lengths( @lfhd, @lbhd, @rfhd, @rbhd ) )
+        p difference
+
+        exit
 
         @good_distance = done?
         next

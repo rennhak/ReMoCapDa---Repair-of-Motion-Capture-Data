@@ -16,6 +16,7 @@ $:.push('.')
 require 'Logger'
 require 'Helpers'
 require 'Repair'
+require 'Mathematics'
 
 # From MotionX - FIXME: Use MotionX's XYAML interface
 $:.push('../base/MotionX/src/plugins/vpm/src')
@@ -38,6 +39,7 @@ class ReMoCapDa
     @config.cache_dir     = "cache"
 
     @logger               = Utils::Logger.new( @options )
+    @mathematics          = Mathematics.new
 
     unless( options.nil? ) # {{{
       @logger.message( :success, "Starting #{__FILE__} run" )
@@ -92,7 +94,7 @@ class ReMoCapDa
     @input.combine
 
     # Localize all coordinates to pt30
-    @input.local_coordinate_system( :pt30 )
+    @input.local_coordinate_system( :pt30, true )
 
     # store current marker information in yaml for later
     segments = Hash.new
@@ -115,6 +117,35 @@ class ReMoCapDa
       end
     end
 
+#    # Calculate angles
+#    angles        = Hash.new
+#
+#    markers       = Hash.new
+#    segments.keys.each do |name|
+#      %w[xtran ytran ztran].each do |direction|
+#        markers[ name.to_s ] = [] if( markers[ name.to_s ].nil? )
+#        markers[ name.to_s ] << segments[ name.to_s ][ direction.to_s ]
+#      end
+#    end
+#
+#    # Calculate angles of head markers to each other
+#    angle_list                = [ %w[lbhd lfhd lbhd rbhd], %w[rbhd lbhd rbhd rfhd], %w[rfhd rbhd rfhd lfhd], %w[lfhd rfhd lfhd lbhd] ]
+#
+#    p markers[ "lbhd" ]
+#    p markers[ "lfhd" ]
+#    p markers[ "rbhd" ]
+#    p markers[ "rfhd" ]
+#
+#    angle_list.each do |m|
+#      one, two, three, four = *m
+#      name                  = m.join("_")
+#      result                = @mathematics.angle_between_two_lines( markers[ one.to_s ], markers[ two.to_s ], markers[ three.to_s ], markers[ four.to_s ] )
+#
+#      angles[ name.to_s ]   = result
+#    end
+#
+#    p angles
+#    yaml_angles = angles.to_yaml
     yaml = segments.to_yaml
 
     # store this data to yaml
@@ -149,14 +180,14 @@ class ReMoCapDa
     @input                      = ADT.new( @options.input_filename.to_s )
 
     # Localize all coordinates to pt30
-    @input.local_coordinate_system( :pt30 )
+    @input.local_coordinate_system( :pt30, true )
 
     @logger.message( :info, "Repairing the motion capture data" )
     repair = Repair.new( @logger, yaml, threshhold )
     @input = repair.run( @input )
 
     # Localize all coordinates to pt30
-    @input.local_coordinate_system_undo( :pt30 )
+    @input.local_coordinate_system_undo( :pt30, true )
 
     # Store result to disk
     @logger.message( :info, "Writing file" )

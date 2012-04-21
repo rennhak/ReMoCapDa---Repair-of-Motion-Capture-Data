@@ -90,7 +90,6 @@ class Helpers
     result
   end # of def eucledian_distance point1, point2 }}}
 
-
 end # of class Helpers # }}}
 
 

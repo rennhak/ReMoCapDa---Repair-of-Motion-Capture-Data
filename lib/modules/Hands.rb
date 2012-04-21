@@ -51,9 +51,9 @@ class Hands
 
     reference         = [ @yaml.rfin, @yaml.rwra, @yaml.rwrb, @yaml.lfin, @yaml.lwra, @yaml.lwrb ]
 
-    @yaml_frame_hands  = get_lengths( *( reference.collect { |i| ostruct_to_array( i ) } ) )
+    @yaml_frame_hands = get_lengths( *( reference.collect { |i| ostruct_to_array( i ) } ) )
 
-    @frame_hands       = nil
+    @frame_hands      = nil
 
     @rfin             = nil
     @rwra             = nil
@@ -61,6 +61,10 @@ class Hands
     @lfin             = nil
     @lwra             = nil
     @lwrb             = nil
+
+    # We need the elbows as well
+    @lelb             = nil
+    @relb             = nil
 
   end # of def initialize }}}
 
@@ -152,8 +156,8 @@ class Hands
   # @param    [Array]         rfin            Array for the rfin marker
   #
   # @note     All marker arrays are in the shape of the VPM data provided by the MptionX::VPM Plugin.
-  def set_markers rfin = @rfin, rwra = @rwra, rwrb = @rwrb, lfin = @lfin, lwra = @lwra, lwrb = @lwrb
-    @rfin, @rwra, @rwrb, @lfin, @lwra, @lwrb  = rfin, rwra, rwrb, lfin, lwra, lwrb
+  def set_markers rfin = @rfin, rwra = @rwra, rwrb = @rwrb, lfin = @lfin, lwra = @lwra, lwrb = @lwrb, lelb = @lelb, relb = @relb
+    @rfin, @rwra, @rwrb, @lfin, @lwra, @lwrb, @lelb, @relb  = rfin, rwra, rwrb, lfin, lwra, lwrb, lelb, relb
   end # of def set_markers rfin = @rfin, rwra = @rwra, rwrb = @rwrb, lfin = @lfin, lwra = @lwra, lwrb = @lwrb # }}}
 
 
@@ -229,11 +233,28 @@ class Hands
       @logger.message( :debug, "Iterating over good distance check for frame until it is fixed (#{@good_distance.join( ", " )})" )
 
       if( @good_distance[0] )  # rfin <-> rwra is ok
-        raise NotImplementedError
+        difference = get_difference( get_lengths( @rfin, @rwra, @rwrb, @lfin, @lwra, @lwrb ) )
+        p difference
+
+
+        y_relb = ostruct_to_array( @yaml.relb )
+        y_lelb = ostruct_to_array( @yaml.lelb )
+        
+        p y_relb
+        p @relb[0,3]
+        p "--"
+
+        p y_lelb
+        p @lelb[0,3]
+
+        exit
         next
       end
 
       if( @good_distance[1] )  # rfin <-> rwrb is ok
+
+       raise NotImplementedError
+
         @logger.message( :warning," ---> Repair" )
         @rwra[0]  = @rwrb[0] - (@yaml.rwrb.xtran.abs - @yaml.rwra.xtran.abs)
         @rwra[1]  = @rwrb[1]
