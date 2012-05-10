@@ -21,6 +21,7 @@
 # Libaries
 $:.push('..')
 require 'Helpers.rb'
+require 'Mathematics.rb'
 
 
 # @class      class Hands # {{{
@@ -44,10 +45,11 @@ class Hands
     @yaml             = yaml
     @threshhold       = threshhold
     @helpers          = Helpers.new
+    @mathematics      = Mathematics.new
 
     # Go through markers and correct where incorrect 0..n
     @keys             = yaml.instance_variable_get("@table").keys
-    @order            = [ "rfin_rwra", "rfin_rwrb", "lfin_lwra", "lfin_lwrb", "rwra_rwrb", "lwra_lwrb" ]
+    @order            = [ "rfin_rwra", "rfin_rwrb", "rwra_rwrb", "lfin_lwra", "lfin_lwrb", "lwra_lwrb" ]
 
     reference         = [ @yaml.rfin, @yaml.rwra, @yaml.rwrb, @yaml.lfin, @yaml.lwra, @yaml.lwrb ]
 
@@ -108,6 +110,9 @@ class Hands
     difference          = get_difference( @frame_hands )
 
     result = true if( difference[ "sum" ] > threshhold )
+
+    @logger.message :debug, "RFIN (#{@rfin[0,3].join(",")}), RWRA (#{@rwra[0,3].join(",")}), RWRB (#{@rwrb[0,3].join(",")}) - LFIN (#{@lfin[0,3].join(",")}) LWRA (#{@lwra[0,3].join(",")}) LWRB (#{@lwrb[0,3].join(",")})"
+    @logger.message :debug, "RELB (#{@relb[0,3].join(",")}), LELB (#{@lelb[0,3].join(",")})"
 
     result
   end # of def repair_hands? rfin = @rfin, rwra = @rwra, rwrb = @rwrb, lfin = @lfin, lwra = @lwra, lwrb = @lwrb, threshhold = @threshhold # }}}
@@ -228,62 +233,171 @@ class Hands
 
     # Iterate over markers until repaired
     @good_distance = done?
+
     while( @good_distance.include?( false ) )
 
       @logger.message( :debug, "Iterating over good distance check for frame until it is fixed (#{@good_distance.join( ", " )})" )
 
-      if( @good_distance[0] )  # rfin <-> rwra is ok
-        difference = get_difference( get_lengths( @rfin, @rwra, @rwrb, @lfin, @lwra, @lwrb ) )
-        p difference
+      difference = get_difference( get_lengths( @rfin, @rwra, @rwrb, @lfin, @lwra, @lwrb ) )
 
-
-        y_relb = ostruct_to_array( @yaml.relb )
-        y_lelb = ostruct_to_array( @yaml.lelb )
-        
-        p y_relb
-        p @relb[0,3]
-        p "--"
-
-        p y_lelb
-        p @lelb[0,3]
-
-        exit
-        next
-      end
-
-      if( @good_distance[1] )  # rfin <-> rwrb is ok
-
-       raise NotImplementedError
-
-        @logger.message( :warning," ---> Repair" )
-        @rwra[0]  = @rwrb[0] - (@yaml.rwrb.xtran.abs - @yaml.rwra.xtran.abs)
-        @rwra[1]  = @rwrb[1]
-        @rwra[2]  = @rwrb[2]
+      unless( @good_distance[0] ) # rfin_rwra => damaged
+        break
+        raise NotImplementedError
 
         @good_distance = done?
         next
       end
 
-      if( @good_distance[2] )  # lfin <-> lwra is ok
+      unless( @good_distance[1] ) # rfin_rwrb
         raise NotImplementedError
-        next
-      end
- 
-      if( @good_distance[3] )  # lfin <-> lwrb is ok
-        raise NotImplementedError
+
+        @good_distance = done?
         next
       end
 
-      if( @good_distance[4] )  # rwra <-> rwrb is ok
+      unless( @good_distance[2] ) # rwra_rwrb
         raise NotImplementedError
+
+        @good_distance = done?
         next
       end
 
-      if( @good_distance[5] )  # lwra lwrb is ok
+      unless( @good_distance[3] ) # lfin_lwra
         raise NotImplementedError
+
+        @good_distance = done?
         next
       end
 
+      unless( @good_distance[4] ) # lfin_lwrb
+
+        # Guard
+        raise ArgumentError, "Distance lfin_lwra is damaged as well, how to repair?" unless( @good_distance[3] )
+
+        # TODO: Check lelb is ok
+
+        # Took the inspiration from
+        # http://board.flashkit.com/board/showthread.php?t=814954
+
+        # We use the triangle lfin_lwrb_lwra, where we know that lfin and lwra are ok
+        #
+        #            o  lfin
+        #           / \
+        #          /   \
+        # C lwrb  o-----o  B lwra
+        #         \     /
+        #          \   /
+        #           \ /
+        #            o
+        #         A lelb
+        #
+        # We know the distances
+
+        # a = @lelb[0,3]
+        # b = @lwra[0,3]
+
+        # u = [ b[0]-a[0], b[1]-a[1], b[2]-a[2] ]
+
+        # dangle_yx = Math.atan2( u[1], u[0] ) - Math::PI / 3   # // z axis from x, y/x forms z angle 
+        # dangle_zx = Math.atan2( u[2], u[0] ) - Math::PI / 3   # // y axis from x, z/x forms y angle 
+        # dangle_zy = Math.atan2( u[2], u[1] ) - Math::PI / 3   # // x axis from y, z/y forms x angle 
+
+        # dist_yx   = Math.sqrt( u[1]*u[1] + u[0]*u[0] )
+        # dist_zx   = Math.sqrt( u[2]*u[2] + u[0]*u[0] )
+        # dist_zy   = Math.sqrt( u[2]*u[2] + u[1]*u[1] )
+
+        # yx = []
+        # yx << Math.cos( dangle_yx ) * dist_yx + a[0]
+        # yx << Math.sin( dangle_yx ) * dist_yx + a[1]
+
+        # zx = []
+        # zx << Math.cos( dangle_zx ) * dist_zx + a[2]
+        # zx << Math.sin( dangle_zx ) * dist_zx + a[0]
+
+        # zy = []
+        # zy << Math.cos( dangle_zy ) * dist_zy + a[2]
+        # zy << Math.sin( dangle_zy ) * dist_zy + a[1]
+
+        # @lwrb[0] = yx[0]
+        # @lwrb[1] = zx[0]
+        # @lwrb[2] = zy[0]
+
+        # @logger.message :debug, "@lwrb -> #{@lwrb[0,3].join(',')}"
+        # @logger.message :debug, "yaml lwrb -> #{ostruct_to_array( @yaml.lwrb ).join(',')}"
+        # p yx
+        # p zx
+        # p zy
+
+        # p difference
+        STDIN.gets
+
+        # exit
+
+        @good_distance = done?
+        next
+      end
+
+      unless( @good_distance[5] ) # lwra_lwrb
+        raise NotImplementedError
+
+        @good_distance = done?
+        next
+      end
+
+#      if( @good_distance[0] )  # rfin <-> rwra is ok
+#
+#        # Guard
+#        raise ArgumentError, "RFIN <-> RWRA must be below thresshold" if( difference[ "rfin_rwra" ] > @threshhold )
+#
+#        
+#
+#        y_relb = ostruct_to_array( @yaml.relb )
+#        y_lelb = ostruct_to_array( @yaml.lelb )
+#
+#        p y_relb
+#        p @relb[0,3]
+#        p "--"
+#
+#        p y_lelb
+#        p @lelb[0,3]
+#
+#        exit
+#        next
+#      end
+#
+#      if( @good_distance[1] )  # rfin <-> rwrb is ok
+#
+#       raise NotImplementedError
+#
+#        @logger.message( :warning," ---> Repair" )
+#        @rwra[0]  = @rwrb[0] - (@yaml.rwrb.xtran.abs - @yaml.rwra.xtran.abs)
+#        @rwra[1]  = @rwrb[1]
+#        @rwra[2]  = @rwrb[2]
+#
+#        @good_distance = done?
+#        next
+#      end
+#
+#      if( @good_distance[2] )  # lfin <-> lwra is ok
+#        raise NotImplementedError
+#        next
+#      end
+# 
+#      if( @good_distance[3] )  # lfin <-> lwrb is ok
+#        raise NotImplementedError
+#        next
+#      end
+#
+#      if( @good_distance[4] )  # rwra <-> rwrb is ok
+#        raise NotImplementedError
+#        next
+#      end
+#
+#      if( @good_distance[5] )  # lwra lwrb is ok
+#        raise NotImplementedError
+#        next
+#      end
+#
     end # of while
 
     [ @rwra, @rwrb, @lwra, @lwrb, @lfin, @rfin ]
