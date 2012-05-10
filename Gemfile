@@ -2,10 +2,13 @@
 
 source "http://rubygems.org"
 
-gem 'rake'
 gem 'narray'
 gem 'gsl'
 
 group :development do
+  gem 'rake'
+  gem 'rspec'
+  gem 'cucumber'
+  gem 'gherkin'
 end
 
