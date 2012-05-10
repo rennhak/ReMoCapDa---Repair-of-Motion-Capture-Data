@@ -36,15 +36,18 @@ class Repair
   # @fn       def initialize # {{{
   # @brief    Default constructor of the Repair class
   #
+  # @param    [OpenStruct]    options       OpenStruct containing the result of the CLI argument parsing
   # @param    [Logger]        logger        Logger class
   # @param    [OpenStruct]    yaml          OpenStruct containing the loaded yaml
   # @param    [Fixnum]        threshhold    Threshhold for the repair detection
-  def initialize logger = nil, yaml = nil, threshhold = nil
+  def initialize options = nil, logger = nil, yaml = nil, threshhold = nil
 
     # Sanity check
+    raise ArgumentError, "Options can't be nil" if( options.nil? )
     raise ArgumentError, "Logger can't be nil" if( logger.nil? )
     raise ArgumentError, "Yaml can't be nil" if( yaml.nil? )
     raise ArgumentError, "Threshhold can't be nil" if( threshhold.nil? )
+    raise ArgumentError, "No Modules to repair given by commandline (-m)" if( options.modules.empty? )
 
     @logger       = logger
     @yaml         = yaml
@@ -54,9 +57,17 @@ class Repair
     @keys         = yaml.instance_variable_get("@table").keys
 
     # Repair modules
-    @head         = Head.new( logger, yaml, threshhold )
-    @hands        = Hands.new( logger, yaml, threshhold )
+    @head, @hands = nil, nil
 
+    if( options.modules.include?( "head" ) )
+      @head         = Head.new( logger, yaml, threshhold )
+      @logger.message :info, "Going to repair the HEAD"
+    end
+
+    if( options.modules.include?( "hands" ) )
+      @hands        = Hands.new( logger, yaml, threshhold )
+      @logger.message :info, "Going to repair the HANDS"
+    end
   end # of def initialize }}}
 
 
@@ -99,44 +110,50 @@ class Repair
       data = Helpers.new.hashes_to_ostruct( data )
 
       @logger.message( :debug, "[ Frame: #{frame_index.to_s} ]" )
-#      @logger.message( :debug, "\tChecking if head needs repair" )
-#
-#      # Do checking and repair
-#      @head.set_markers( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
-#
-#      if( @head.repair_head? )
-#        @logger.message( :warning, "Repairing head at frame (#{frame_index.to_s})" )
-#
-#        lfhd, lbhd, rfhd, rbhd, pt24 = @head.repair_head!
-#
-#        %w[lfhd lbhd rfhd rbhd pt24].each do |marker|
-#          eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
-#          eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
-#          eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
-#        end
-#      end # of repair_head
 
-      @logger.message( :debug, "\tChecking if hand needs repair" )
-      @hands.set_markers( data.rfin, data.rwra, data.rwrb, data.lfin, data.lwra, data.lwrb, data.lelb, data.relb )
+      unless( @head.nil? ) # {{{
+        @logger.message( :debug, "\tChecking if head needs repair" )
 
-      if( @hands.repair_hands? )
-        @logger.message( :warning, "Repairing hand at frame (#{frame_index.to_s})" )
+        # Do checking and repair
+        @head.set_markers( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
 
-        rfin, rwra, rwrb, lfin, lwra, lwrb = @hands.repair_hands!
+        if( @head.repair_head? )
+          @logger.message( :warning, "Repairing head at frame (#{frame_index.to_s})" )
 
-        %w[rfin rwra rwrb lfin lwra lwrb].each do |marker|
-          eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
-          eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
-          eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
-        end
+          lfhd, lbhd, rfhd, rbhd, pt24 = @head.repair_head!
 
-      end # of repair_hands
+          %w[lfhd lbhd rfhd rbhd pt24].each do |marker|
+            eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
+            eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
+            eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
+          end
+        end # of repair_head
+      end # unless( @head.nil? ) # }}}
+
+      unless( @hands.nil? ) # {{{
+        @logger.message( :debug, "\tChecking if hand needs repair" )
+        @hands.set_markers( data.rfin, data.rwra, data.rwrb, data.lfin, data.lwra, data.lwrb, data.lelb, data.relb )
+
+        if( @hands.repair_hands? )
+          @logger.message( :warning, "Repairing hand at frame (#{frame_index.to_s})" )
+
+          rfin, rwra, rwrb, lfin, lwra, lwrb = @hands.repair_hands!
+
+          %w[rfin rwra rwrb lfin lwra lwrb].each do |marker|
+            eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
+            eval( "motion_capture_data.#{marker.to_s}.ytran[ #{frame_index.to_i} ] = #{marker.to_s}[1]" )
+            eval( "motion_capture_data.#{marker.to_s}.ztran[ #{frame_index.to_i} ] = #{marker.to_s}[2]" )
+          end
+
+        end # of repair_hands
+      end # unless( @hands.nil? ) # }}}
 
     end # of 0.upto( frames - 1 )
 
     # Return result
     result
   end # of def run # }}}
+
 
 end # of class Repair }}}
 
