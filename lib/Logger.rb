@@ -1,4 +1,4 @@
-#!/usr/bin/ruby19
+#!/usr/bin/ruby
 #
 
 
@@ -15,6 +15,12 @@ module Utils # {{{
   class Logger # {{{
 
     def initialize options = nil # {{{
+
+      # Input verification # {{{
+      raise ArgumentError, "Options can't be nil" if( options.nil? )
+      raise ArgumentError, "Options must be of type OpenStruct" unless( options.is_a?( OpenStruct ) )
+      # }}}
+
       @options = options
     end  # }}}
 
@@ -70,6 +76,12 @@ module Utils # {{{
     #
     # Helpers: colorize
     def message level, msg, colorize = @options.colorize
+
+      # Input verification {{{
+      raise ArgumentError, "Level can't be nil" if( level.nil? )
+      raise ArgumentError, "Message can't be nil" if( msg.nil? )
+      raise ArgumentError, "Coloize can't be nil" if( colorize.nil? )
+      # }}}
 
       symbols = {
         :info      => [ "(--)", "Brown"       ],
