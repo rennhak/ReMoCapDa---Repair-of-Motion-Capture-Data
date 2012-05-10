@@ -38,10 +38,12 @@ class ReMoCapDa
     @config.archive_dir   = "archive"
     @config.cache_dir     = "cache"
 
-    @logger               = Utils::Logger.new( @options )
     @mathematics          = Mathematics.new
+    @modules              = Dir.glob( "modules/*.rb" ).collect { |mod| File.basename( mod, ".rb" ).to_s.downcase }
 
     unless( options.nil? ) # {{{
+      @logger             = Utils::Logger.new( @options )
+
       @logger.message( :success, "Starting #{__FILE__} run" )
       @logger.message( :info, "Colorizing output as requested" ) if( @options.colorize )
 
@@ -61,7 +63,6 @@ class ReMoCapDa
 
       # Repair input motion file with yaml config
       repair_input if( @options.repair_input )
-
 
       @logger.message( :success, "Finished #{__FILE__} run" )
     end # of unless( options.nil? ) }}}
@@ -201,7 +202,6 @@ class ReMoCapDa
   # @fn         def crop # {{{
   # @brief      Crop takes a input and crops out given a specific frame region and outputs the result to a give output file
   def crop
-
     # Sanity check guards
     raise ArgumentError, "Input filename cannot be nil" if( @options.input_filename.nil? )
     raise ArgumentError, "Output filename cannot be nil" if( @options.output_filename.nil? )
@@ -272,10 +272,13 @@ class ReMoCapDa
     options.from                    = nil
     options.to                      = nil
 
+    options.modules                 = []
+
     # Boolean swtiches for control flow
     options.crop                    = false
     options.extract_config          = false
     options.repair_input            = false
+
 
     pristine_options                = options.dup
 
@@ -285,7 +288,8 @@ class ReMoCapDa
       opts.separator ""
       opts.separator "General options:"
 
-      # Boolean
+      opts.on( "-m", "--module OPT", @modules, "Determines which parts of the motion capture set should be repaired (e.g. #{@modules.join(", ")})" ) { |m| options.modules << m }
+
       opts.on( "-x", "--crop", "Crop Input Motion stream (needs also --from and --to)" ) { |crop| options.crop = crop }
 
       opts.on( "-f", "--from OPT", "From frame" ) { |frame| options.from = frame.to_i }
