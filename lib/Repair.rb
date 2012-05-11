@@ -40,18 +40,22 @@ class Repair
   # @param    [Logger]        logger        Logger class
   # @param    [OpenStruct]    yaml          OpenStruct containing the loaded yaml
   # @param    [Fixnum]        threshhold    Threshhold for the repair detection
-  def initialize options = nil, logger = nil, yaml = nil, threshhold = nil
+  # @param    [ADT]           data          Motion Capture class MotionX::ADT
+  def initialize options = nil, logger = nil, yaml = nil, threshhold = nil, data = nil
 
-    # Sanity check
+    # Sanity check # {{{
     raise ArgumentError, "Options can't be nil" if( options.nil? )
     raise ArgumentError, "Logger can't be nil" if( logger.nil? )
     raise ArgumentError, "Yaml can't be nil" if( yaml.nil? )
     raise ArgumentError, "Threshhold can't be nil" if( threshhold.nil? )
     raise ArgumentError, "No Modules to repair given by commandline (-m)" if( options.modules.empty? )
+    raise ArgumentError, "Motion capture data cannot be nil" if( data.nil? )
+    # }}}
 
     @logger       = logger
     @yaml         = yaml
     @threshhold   = threshhold
+    @data         = data
 
     # Go through markers and correct where incorrect 0..n
     @keys         = yaml.instance_variable_get("@table").keys
@@ -60,22 +64,93 @@ class Repair
     @head, @hands = nil, nil
 
     if( options.modules.include?( "head" ) )
-      @head         = Head.new( logger, yaml, threshhold )
+      @head       = Head.new( logger, yaml, threshhold )
       @logger.message :info, "Going to repair the HEAD"
     end
 
     if( options.modules.include?( "hands" ) )
-      @hands        = Hands.new( logger, yaml, threshhold )
+      @hands      = Hands.new( logger, yaml, threshhold )
       @logger.message :info, "Going to repair the HANDS"
     end
+
+    @broken       = scan( @data )
   end # of def initialize }}}
+
+
+  # @fn       def scan # {{{
+  # @brief    Scans through the data to determine which parts need to be repaired
+  #
+  # @param    [ADT]     motion_capture_data       Motion Capture class MotionX::ADT
+  def scan motion_capture_data = @data
+
+    # Sanity check
+    raise ArgumentError, "Motion capture data cannot be nil" if( motion_capture_data.nil? )
+
+    @logger.message( :info, "Scanning data to determine what needs to be repaired" )
+
+    result    = motion_capture_data
+    segments  = motion_capture_data.segments
+
+    repair    = Hash.new  # we store our boolean array's here
+
+    # Determine runtime of motion data
+    frames    = ( motion_capture_data.instance_variable_get( "@#{segments.first.to_s}" ).frames ).to_i
+    order     = ( motion_capture_data.instance_variable_get( "@#{segments.first.to_s}" ).order )
+
+    # Iterate over the entire data
+    0.upto( frames - 1 ) do |frame_index|
+
+      # Create empty arrays for each segment, the array will hold the data for 1 frame
+      data    = Hash.new
+      segments.each { |segment| data[ segment.to_s ] = [] }
+
+      # Extract the data for all segments for 1 frame
+      segments.each do |segment|
+        order.each do |o|
+          value = eval( "motion_capture_data.#{segment.to_s}.#{o.to_s}[ #{frame_index.to_i} ]" )
+          value = 0.0 if( value.nil? )
+
+          data[ segment.to_s ] << value
+        end
+      end # of segments.each
+
+      # Turn hash into proper ostruct
+      data = Helpers.new.hashes_to_ostruct( data )
+
+      @logger.message( :debug, "[ Frame: #{frame_index.to_s} ]" )
+
+      unless( @head.nil? ) # {{{
+        @logger.message( :debug, "\tChecking if head needs repair" )
+
+        repair[ "head" ] = [] if( repair[ "head" ].nil? )
+
+        # Do checking and repair
+        @head.set_markers( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
+
+        repair[ "head" ][ frame_index ] = @head.repair_head?
+      end # unless( @head.nil? ) # }}}
+
+      unless( @hands.nil? ) # {{{
+        @logger.message( :debug, "\tChecking if hand needs repair" )
+        repair[ "hands" ] = [] if( repair[ "hands" ].nil? )
+
+        @hands.set_markers( data.rfin, data.rwra, data.rwrb, data.lfin, data.lwra, data.lwrb, data.lelb, data.relb )
+
+        repair[ "hands" ][ frame_index ] = @hands.repair_hands?
+      end # unless( @hands.nil? ) # }}}
+
+    end # of 0.upto( frames - 1 )
+
+    # Return result
+    repair
+  end # of def scan # }}}
 
 
   # @fn       def run # {{{
   # @brief    Run checks the motion data for problems and tries to repair it
   #
   # @param    [ADT]     motion_capture_data       Motion Capture class MotionX::ADT
-  def run motion_capture_data = nil
+  def run motion_capture_data = @data
 
     # Sanity check
     raise ArgumentError, "Motion capture data cannot be nil" if( motion_capture_data.nil? )
@@ -153,6 +228,7 @@ class Repair
     # Return result
     result
   end # of def run # }}}
+
 
 end # of class Repair }}}
 
