@@ -154,7 +154,6 @@ class Repair
     result
   end # of def run # }}}
 
-
 end # of class Repair }}}
 
 
