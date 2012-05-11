@@ -47,6 +47,8 @@ class Hands
     @helpers          = Helpers.new
     @mathematics      = Mathematics.new
 
+    @logger.message :debug, "Using threshhold (#{threshhold.to_s})"
+
     # Go through markers and correct where incorrect 0..n
     @keys             = yaml.instance_variable_get("@table").keys
     @order            = [ "rfin_rwra", "rfin_rwrb", "rwra_rwrb", "lfin_lwra", "lfin_lwrb", "lwra_lwrb" ]
@@ -67,6 +69,8 @@ class Hands
     # We need the elbows as well
     @lelb             = nil
     @relb             = nil
+
+    @repair_frames    = nil
 
   end # of def initialize }}}
 
@@ -150,6 +154,13 @@ class Hands
   end # of def get_difference reference_frame = nil, frame = nil # }}}
 
 
+  # @fn       def set_repair_frames array = nil # {{{
+  # @brief    These data points 
+  def set_repair_frames array = nil
+    @frames = array
+  end # of def set_repair_frames array = nil # }}}
+
+
   # @fn       def set_markers rfin = @rfin, rwra = @rwra, rwrb = @rwrb, lfin = @lfin, lwra = @lwra, lwrb = @lwrb # {{{
   # @brief    Sets markers inside the class state
   #
@@ -230,6 +241,46 @@ class Hands
 
     raise ArgumentError, "threshhold can't be nil" if( threshhold.nil? )
 
+    # check repair frames (before, self, after)
+    b_index, b_data     = [], []
+    s_index, s_data     = [], []
+    a_index, a_data     = [], []
+
+    @frames[0].each { |array| b_index << array.first ; b_data << array.last }
+    @frames[1].each { |array| s_index << array.first ; s_data << array.last }
+    @frames[2].each { |array| a_index << array.first ; a_data << array.last }
+
+    large_distance      = false
+
+    @logger.message( :debug, "Before frames are fine, we have two valid ones (#{b_index.join(" ")})" ) if( b_index.length >= 2 )
+    @logger.message( :warning, "Before frames are thin, we have ONLY one valid one (#{b_index.join(" ")})" ) if( b_index.length == 1 )
+    @logger.message( :error, "We have no before frames, that means we cannot interpolate to repair" ) if( b_index.length == 0 )
+
+    if( b_index.length > 0 )
+      b_diff              = 0
+      b_index.each { |x| b_diff += (x - s_index.first).abs } 
+      b_diff /= b_index.length
+
+      @logger.message( :error, "Seems the distance between self index (#{s_index.join(" ")}) and before (#{b_index.join(" ")}) is too large" ) if( b_diff > 10 )
+      large_distance      = true
+    end
+
+    raise ArgumentError, "There was some problem with the @frames, we don't have the self frame?!" unless( s_index.length == 1 )
+
+    @logger.message( :debug, "After frames are fine, we have two valid ones (#{a_index.join(" ")})" ) if( a_index.length >= 2 )
+    @logger.message( :warning, "After frames are thin, we have ONLY one valid one (#{a_index.join(" ")})" ) if( a_index.length == 1 )
+    @logger.message( :error, "We have no after frames, that means we cannot interpolate to repair" ) if( a_index.length == 0 )
+
+    if( a_index.length > 0 )
+      a_diff              = 0
+      a_index.each { |x| a_diff += ( x - s_index.first ).abs }
+      a_diff /= a_index.length
+
+      @logger.message( :error, "Seems the distance between self index (#{s_index.join(" ")}) and after (#{a_index.join(" ")}) is too large" ) if( a_diff > 10 )
+      large_distance      = true
+    end
+
+    exit
 
     # Iterate over markers until repaired
     @good_distance = done?
@@ -237,11 +288,10 @@ class Hands
     while( @good_distance.include?( false ) )
 
       @logger.message( :debug, "Iterating over good distance check for frame until it is fixed (#{@good_distance.join( ", " )})" )
-
+ 
       difference = get_difference( get_lengths( @rfin, @rwra, @rwrb, @lfin, @lwra, @lwrb ) )
 
       unless( @good_distance[0] ) # rfin_rwra => damaged
-        break
         raise NotImplementedError
 
         @good_distance = done?
@@ -271,6 +321,15 @@ class Hands
 
       unless( @good_distance[4] ) # lfin_lwrb
 
+        p "--"
+        p before_frames
+        p "--"
+        p self_frame
+        p "--"
+        p after_frames
+        p "--"
+
+        raise NotImplementedError
         # Guard
         raise ArgumentError, "Distance lfin_lwra is damaged as well, how to repair?" unless( @good_distance[3] )
 
@@ -329,7 +388,7 @@ class Hands
         # p zy
 
         # p difference
-        STDIN.gets
+        # STDIN.gets
 
         # exit
 

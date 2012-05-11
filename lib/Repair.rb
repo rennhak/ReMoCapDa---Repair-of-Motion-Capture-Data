@@ -73,7 +73,9 @@ class Repair
       @logger.message :info, "Going to repair the HANDS"
     end
 
-    @broken       = scan( @data )
+    # p @scanned[ "hands" ].first  => [ true|false, data ostruct ]
+    @scanned      = scan( @data )
+
   end # of def initialize }}}
 
 
@@ -127,7 +129,7 @@ class Repair
         # Do checking and repair
         @head.set_markers( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
 
-        repair[ "head" ][ frame_index ] = @head.repair_head?
+        repair[ "head" ][ frame_index ] = [ @head.repair_head?, data  ]
       end # unless( @head.nil? ) # }}}
 
       unless( @hands.nil? ) # {{{
@@ -136,7 +138,7 @@ class Repair
 
         @hands.set_markers( data.rfin, data.rwra, data.rwrb, data.lfin, data.lwra, data.lwrb, data.lelb, data.relb )
 
-        repair[ "hands" ][ frame_index ] = @hands.repair_hands?
+        repair[ "hands" ][ frame_index ] = [ @hands.repair_hands?, data ]
       end # unless( @hands.nil? ) # }}}
 
     end # of 0.upto( frames - 1 )
@@ -150,7 +152,8 @@ class Repair
   # @brief    Run checks the motion data for problems and tries to repair it
   #
   # @param    [ADT]     motion_capture_data       Motion Capture class MotionX::ADT
-  def run motion_capture_data = @data
+  # @param    [Hash]    scanned                   Output from the scan function
+  def run motion_capture_data = @data, scanned = @scanned
 
     # Sanity check
     raise ArgumentError, "Motion capture data cannot be nil" if( motion_capture_data.nil? )
@@ -167,35 +170,39 @@ class Repair
     # Iterate over the entire data
     0.upto( frames - 1 ) do |frame_index|
 
-      # Create empty arrays for each segment, the array will hold the data for 1 frame
-      data    = Hash.new
-      segments.each { |segment| data[ segment.to_s ] = [] }
+      # # Create empty arrays for each segment, the array will hold the data for 1 frame
+      # data    = Hash.new
+      # segments.each { |segment| data[ segment.to_s ] = [] }
 
-      # Extract the data for all segments for 1 frame
-      segments.each do |segment|
-        order.each do |o|
-          value = eval( "motion_capture_data.#{segment.to_s}.#{o.to_s}[ #{frame_index.to_i} ]" )
-          value = 0.0 if( value.nil? )
-
-          data[ segment.to_s ] << value
-        end
-      end # of segments.each
+      # # Extract the data for all segments for 1 frame
+      # segments.each do |segment|
+      #   order.each do |o|
+      #    value = eval( "motion_capture_data.#{segment.to_s}.#{o.to_s}[ #{frame_index.to_i} ]" )
+      #    value = 0.0 if( value.nil? )
+      #
+      #    data[ segment.to_s ] << value
+      #  end
+      # end # of segments.each
 
       # Turn hash into proper ostruct
-      data = Helpers.new.hashes_to_ostruct( data )
+      # data = Helpers.new.hashes_to_ostruct( data )
 
-      @logger.message( :debug, "[ Frame: #{frame_index.to_s} ]" )
+      @logger.message( :debug, "[ Repair Phase ][ Frame: #{frame_index.to_s} ]" )
 
       unless( @head.nil? ) # {{{
-        @logger.message( :debug, "\tChecking if head needs repair" )
+        broken_flag, data = scanned[ "head" ][ frame_index ]
 
         # Do checking and repair
         @head.set_markers( data.lfhd, data.lbhd, data.rfhd, data.rbhd, data.pt24 )
 
-        if( @head.repair_head? )
+        if( broken_flag )
           @logger.message( :warning, "Repairing head at frame (#{frame_index.to_s})" )
 
-          lfhd, lbhd, rfhd, rbhd, pt24 = @head.repair_head!
+          # Determine two frames before frame_index and two after frame_index which are OK
+          frames                        = get_valid_frames( frame_index, scanned[ "head" ] )
+          @head.set_repair_frames( frames )
+
+          lfhd, lbhd, rfhd, rbhd, pt24  = @head.repair_head!
 
           %w[lfhd lbhd rfhd rbhd pt24].each do |marker|
             eval( "motion_capture_data.#{marker.to_s}.xtran[ #{frame_index.to_i} ] = #{marker.to_s}[0]" )
@@ -206,11 +213,16 @@ class Repair
       end # unless( @head.nil? ) # }}}
 
       unless( @hands.nil? ) # {{{
-        @logger.message( :debug, "\tChecking if hand needs repair" )
+        broken_flag, data = scanned[ "hands" ][ frame_index ]
+
         @hands.set_markers( data.rfin, data.rwra, data.rwrb, data.lfin, data.lwra, data.lwrb, data.lelb, data.relb )
 
-        if( @hands.repair_hands? )
+        if( broken_flag )
           @logger.message( :warning, "Repairing hand at frame (#{frame_index.to_s})" )
+
+          # Determine two frames before frame_index and two after frame_index which are OK
+          frames                        = get_valid_frames( frame_index, scanned[ "hands" ] )
+          @hands.set_repair_frames( frames )
 
           rfin, rwra, rwrb, lfin, lwra, lwrb = @hands.repair_hands!
 
@@ -228,6 +240,66 @@ class Repair
     # Return result
     result
   end # of def run # }}}
+
+
+  # @fn         def get_valid_frames index, data # {{{
+  # @brief      Extracts two valid frame indexes before and after the given index which we can use to repair the given frame index.
+  #
+  # @param      [Fixnum]        index         Index which we want to repair. We need two frames before and two after this index which are OK.
+  # @param      [Array]         data          Data array in the shape [ [broken_flag, data], [...], ...] where each element of array index represents the corresponding frame.
+  #
+  # @returns    [Array]                       Returns an array containing three other subarrays [ [before_frame_index1, index2], [index], [after_frame_index1, index2] ]
+  def get_valid_frames index, data
+
+    @logger.message( :debug, "Finding valid frames for index (#{index.to_s})" )
+
+    amount        = 2
+
+    before_frames = []
+    self_frame    = [] << index
+    after_frames  = []
+
+    # get frames from before index which are ok
+    ( index.to_i ).downto( 0 ) do |i|
+      next if( i == index )
+      break if( before_frames.length == amount )
+
+      broken = data[i].first
+      before_frames << i unless( broken )
+    end
+
+    # get frames from after index which are ok
+    ( index.to_i ).upto( data.length.to_i - 1 ) do |i|
+      next if( i == index )
+      break if( after_frames.length == amount )
+
+
+      broken = data[i].first
+      puts "i (#{i.to_s}) broken? #{broken.to_s}"
+      after_frames << i unless( broken )
+    end
+
+    # Corect the order to asc
+    before_frames.sort!
+    self_frame.sort!
+    after_frames.sort!
+
+    # Turn frame IDs into frame IDs + data
+
+    before_frames.collect! do |frame|
+      [ frame, data[ frame.to_i ].last ]
+    end
+
+    self_frame.collect! do |frame|
+      [ frame, data[ frame.to_i ].last ]
+    end
+
+    after_frames.collect! do |frame|
+      [ frame, data[ frame.to_i ].last ]
+    end
+
+    [ before_frames, self_frame, after_frames ]
+  end # of def get_valid_frames index, data # }}}
 
 
 end # of class Repair }}}

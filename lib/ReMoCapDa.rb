@@ -185,7 +185,7 @@ class ReMoCapDa
 
     @logger.message( :info, "Repairing the motion capture data" )
     repair  = Repair.new( @options, @logger, yaml, threshhold, @input )
-    @input  = repair.run( @input )
+    @input  = repair.run
 
     # Localize all coordinates to pt30
     @input.local_coordinate_system_undo( :pt30, true )

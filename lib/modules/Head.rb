@@ -45,6 +45,8 @@ class Head
     @threshhold       = threshhold
     @helpers          = Helpers.new
 
+    @logger.message :debug, "Using threshhold (#{threshhold.to_s})"
+
     # Go through markers and correct where incorrect 0..n
     @keys             = yaml.instance_variable_get("@table").keys
     @order            = [ "lf_lb", "rf_rb", "lf_rf", "lb_rb", "lf_rb", "lb_rf" ]
@@ -60,6 +62,7 @@ class Head
     @rbhd             = nil
     @pt24             = nil
 
+    @frames           = nil
   end # of def initialize }}}
 
 
@@ -128,6 +131,13 @@ class Head
 
     result
   end # of def get_difference reference_frame = nil, frame = nil # }}}
+
+
+  # @fn       def set_repair_frames array = nil # {{{
+  # @brief    These data points 
+  def set_repair_frames array = nil
+    @frames = array
+  end # of def set_repair_frames array = nil # }}}
 
 
   # @fn       def set_markers lfhd = @lfhd, lbhd = @lbhd, rfhd = @rfhd, rbhd = @rbhd, pt24 = @pt24 # {{{
@@ -199,6 +209,22 @@ class Head
     raise ArgumentError, "rbhd can't be nil" if( rbhd.nil? )
     raise ArgumentError, "pt24 can't be nil" if( pt24.nil? )
     raise ArgumentError, "threshhold can't be nil" if( threshhold.nil? )
+
+    # check repair frames
+    before_frames    = @frames[0]
+    self_frame       = @frames[1]
+    after_frames     = @frames[2]
+
+    @logger.message( :debug, "Before frames are fine, we have two valid ones" ) if( before_frames.length >= 2 )
+    @logger.message( :warning, "Before frames are thin, we have ONLY one valid one" ) if( before_frames.length == 1 )
+    @logger.message( :error, "We have no before frames, that means we cannot interpolate to repair" ) if( before_frames.length == 0 )
+
+    raise ArgumentError, "There was some problem with the @frames, we don't have the self frame?!" unless( self_frame.length == 1 )
+
+    @logger.message( :debug, "After frames are fine, we have two valid ones" ) if( after_frames.length >= 2 )
+    @logger.message( :warning, "After frames are thin, we have ONLY one valid one" ) if( after_frames.length == 1 )
+    @logger.message( :error, "We have no after frames, that means we cannot interpolate to repair" ) if( after_frames.length == 0 )
+
 
     # Iterate over markers until repaired
     @good_distance = done?
